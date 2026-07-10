@@ -1,0 +1,20 @@
+name: puzzle_catalog_builder
+description: Streaming Lichess CSV.ZST to Better Puzzles ObjectBox catalog builder.
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.12.1
+
+dependencies:
+  bpuzzles_format:
+    path: ../../packages/bpuzzles_format
+  crypto: ^3.0.7
+  objectbox: ^5.3.2
+  path: ^1.9.1
+  puzzle_catalog_store:
+    path: ../../packages/puzzle_catalog_store
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.29.0

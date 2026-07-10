@@ -1,0 +1,4 @@
+download/
+lib/objectbox.dll
+lib/libobjectbox.so
+lib/libobjectbox.dylib

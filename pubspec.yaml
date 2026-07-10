@@ -16,6 +16,13 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.5
 
+  bpuzzles_format:
+    path: packages/bpuzzles_format
+  puzzle_catalog_store:
+    path: packages/puzzle_catalog_store
+  user_store:
+    path: packages/user_store
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

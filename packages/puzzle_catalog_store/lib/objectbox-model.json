@@ -1,0 +1,232 @@
+{
+  "_note1": "KEEP THIS FILE! Check it into a version control system (VCS) like git.",
+  "_note2": "ObjectBox manages crucial IDs for your object model. See docs for details.",
+  "_note3": "If you have VCS merge conflicts, you must resolve them according to ObjectBox docs.",
+  "entities": [
+    {
+      "id": "1:7222435052136685866",
+      "lastPropertyId": "16:5361497717474733693",
+      "name": "CatalogMetaEntity",
+      "properties": [
+        {
+          "id": "1:500612299266530667",
+          "name": "id",
+          "type": 6,
+          "flags": 129
+        },
+        {
+          "id": "2:5782081772456567651",
+          "name": "catalogId",
+          "indexId": "1:6905926200269102521",
+          "type": 9,
+          "flags": 2080
+        },
+        {
+          "id": "3:6111787636116635896",
+          "name": "catalogSchemaVersion",
+          "type": 6
+        },
+        {
+          "id": "4:6595226800071566378",
+          "name": "displayName",
+          "type": 9
+        },
+        {
+          "id": "5:196283396692085983",
+          "name": "createdAtUtcMs",
+          "type": 6
+        },
+        {
+          "id": "6:7329573228846255086",
+          "name": "sourceName",
+          "type": 9
+        },
+        {
+          "id": "7:6370520348199662824",
+          "name": "sourceFile",
+          "type": 9
+        },
+        {
+          "id": "8:5722708943802314226",
+          "name": "sourceDate",
+          "type": 9
+        },
+        {
+          "id": "9:7619058967542184415",
+          "name": "sourceSha256",
+          "type": 9
+        },
+        {
+          "id": "10:8087518685847816959",
+          "name": "catalogModelFingerprint",
+          "type": 9
+        },
+        {
+          "id": "11:7613157164189558187",
+          "name": "puzzleCount",
+          "type": 6
+        },
+        {
+          "id": "12:4103642622323047215",
+          "name": "minRating",
+          "type": 6
+        },
+        {
+          "id": "13:6007563894127367238",
+          "name": "maxRating",
+          "type": 6
+        },
+        {
+          "id": "14:494779115788541989",
+          "name": "ratingBucketSize",
+          "type": 6
+        },
+        {
+          "id": "15:919300552959361275",
+          "name": "themeDictionaryVersion",
+          "type": 6
+        },
+        {
+          "id": "16:5361497717474733693",
+          "name": "themeDictionarySha256",
+          "type": 9
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "2:4032578052764687250",
+      "lastPropertyId": "20:6602035108214826858",
+      "name": "PuzzleEntity",
+      "properties": [
+        {
+          "id": "1:4864430366868117293",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:7704425131413672588",
+          "name": "lichessPuzzleId",
+          "indexId": "2:5330921247863387048",
+          "type": 9,
+          "flags": 2080
+        },
+        {
+          "id": "3:7495437996446923796",
+          "name": "sourceFen",
+          "type": 9
+        },
+        {
+          "id": "4:8381760580012730701",
+          "name": "setupMoveUci",
+          "type": 9
+        },
+        {
+          "id": "5:2296278808988348994",
+          "name": "puzzleFen",
+          "type": 9
+        },
+        {
+          "id": "6:2368609292546383074",
+          "name": "movesUci",
+          "type": 9
+        },
+        {
+          "id": "7:8904288275141166300",
+          "name": "solutionMovesUci",
+          "type": 9
+        },
+        {
+          "id": "8:7568326827235247035",
+          "name": "solutionPlyCount",
+          "type": 6
+        },
+        {
+          "id": "9:8615843305702429828",
+          "name": "playerColor",
+          "indexId": "3:8082162448884677458",
+          "type": 6,
+          "flags": 8
+        },
+        {
+          "id": "10:5184318142129959560",
+          "name": "rating",
+          "indexId": "4:3045460081408792418",
+          "type": 6,
+          "flags": 8
+        },
+        {
+          "id": "11:6023309680638471977",
+          "name": "ratingBucket",
+          "indexId": "5:6503195156251777203",
+          "type": 6,
+          "flags": 8
+        },
+        {
+          "id": "12:6517666201038560634",
+          "name": "ratingDeviation",
+          "type": 6
+        },
+        {
+          "id": "13:4245200120839882708",
+          "name": "popularity",
+          "indexId": "6:7279904091618283261",
+          "type": 6,
+          "flags": 8
+        },
+        {
+          "id": "14:6317675728251557677",
+          "name": "nbPlays",
+          "indexId": "7:9089614117665705778",
+          "type": 6,
+          "flags": 8
+        },
+        {
+          "id": "15:8091726879409438388",
+          "name": "themes",
+          "type": 9
+        },
+        {
+          "id": "16:7740613688678851289",
+          "name": "openingTags",
+          "type": 9
+        },
+        {
+          "id": "17:6139658544549906136",
+          "name": "gameUrl",
+          "type": 9
+        },
+        {
+          "id": "18:795438971370621484",
+          "name": "themeMaskLow",
+          "type": 6
+        },
+        {
+          "id": "19:4310850192088128260",
+          "name": "themeMaskHigh",
+          "type": 6
+        },
+        {
+          "id": "20:6602035108214826858",
+          "name": "randomKey",
+          "indexId": "8:4895199861874324419",
+          "type": 6,
+          "flags": 8
+        }
+      ],
+      "relations": []
+    }
+  ],
+  "lastEntityId": "2:4032578052764687250",
+  "lastIndexId": "8:4895199861874324419",
+  "lastRelationId": "0:0",
+  "lastSequenceId": "0:0",
+  "modelVersion": 5,
+  "modelVersionParserMinimum": 5,
+  "retiredEntityUids": [],
+  "retiredIndexUids": [],
+  "retiredPropertyUids": [],
+  "retiredRelationUids": [],
+  "version": 1
+}

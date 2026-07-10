@@ -20,8 +20,7 @@ class InMemoryPuzzleCatalogRepository implements PuzzleCatalogRepository {
     ),
     PuzzleRecord(
       lichessPuzzleId: 'demo-002',
-      puzzleFen:
-          'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
+      puzzleFen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2',
       setupMoveUci: 'e7e5',
       solutionMovesUci: 'g1f3',
       rating: 950,
@@ -30,8 +29,7 @@ class InMemoryPuzzleCatalogRepository implements PuzzleCatalogRepository {
     ),
     PuzzleRecord(
       lichessPuzzleId: 'demo-003',
-      puzzleFen:
-          'rnbqkb1r/pppppppp/5n2/8/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 2 2',
+      puzzleFen: 'rnbqkb1r/pppppppp/5n2/8/8/5N2/PPPPPPPP/RNBQKB1R w KQkq - 2 2',
       setupMoveUci: 'g8f6',
       solutionMovesUci: 'd2d4',
       rating: 1100,

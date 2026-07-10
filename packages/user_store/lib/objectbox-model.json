@@ -1,0 +1,210 @@
+{
+  "_note1": "KEEP THIS FILE! Check it into a version control system (VCS) like git.",
+  "_note2": "ObjectBox manages crucial IDs for your object model. See docs for details.",
+  "_note3": "If you have VCS merge conflicts, you must resolve them according to ObjectBox docs.",
+  "entities": [
+    {
+      "id": "1:8862000106999246205",
+      "lastPropertyId": "10:6816352674654132996",
+      "name": "PuzzleProgressEntity",
+      "properties": [
+        {
+          "id": "1:7509318718690922479",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:6902477662408331290",
+          "name": "lichessPuzzleId",
+          "indexId": "1:7503662630407456022",
+          "type": 9,
+          "flags": 2080
+        },
+        {
+          "id": "3:2034898239114396499",
+          "name": "solved",
+          "type": 1
+        },
+        {
+          "id": "4:3114505515841471613",
+          "name": "failed",
+          "type": 1
+        },
+        {
+          "id": "5:1273297180470417698",
+          "name": "attempts",
+          "type": 6
+        },
+        {
+          "id": "6:152024860634825688",
+          "name": "solvedCount",
+          "type": 6
+        },
+        {
+          "id": "7:297809739003150128",
+          "name": "failedCount",
+          "type": 6
+        },
+        {
+          "id": "8:5377939063642702752",
+          "name": "bestTimeMs",
+          "type": 6
+        },
+        {
+          "id": "9:7502464100021774336",
+          "name": "firstSolvedAtMs",
+          "type": 6
+        },
+        {
+          "id": "10:6816352674654132996",
+          "name": "lastPlayedAtMs",
+          "type": 6
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "2:623527614888720126",
+      "lastPropertyId": "11:149959583633955938",
+      "name": "PuzzleRunEntity",
+      "properties": [
+        {
+          "id": "1:2137514930380325738",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:1067164091697929809",
+          "name": "catalogId",
+          "indexId": "2:4144192260262780232",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:5052379170720645982",
+          "name": "mode",
+          "type": 9
+        },
+        {
+          "id": "4:7740477589593426677",
+          "name": "startedAtMs",
+          "indexId": "3:5537391396795520352",
+          "type": 6,
+          "flags": 8
+        },
+        {
+          "id": "5:5422719788406901511",
+          "name": "endedAtMs",
+          "type": 6
+        },
+        {
+          "id": "6:7563980215125010059",
+          "name": "score",
+          "type": 6
+        },
+        {
+          "id": "7:6288812803715029686",
+          "name": "streak",
+          "type": 6
+        },
+        {
+          "id": "8:3450391133728551473",
+          "name": "mistakes",
+          "type": 6
+        },
+        {
+          "id": "9:2584725949768862474",
+          "name": "minRating",
+          "type": 6
+        },
+        {
+          "id": "10:6560044463459980990",
+          "name": "maxRating",
+          "type": 6
+        },
+        {
+          "id": "11:149959583633955938",
+          "name": "randomMode",
+          "type": 1
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "3:1880154504866592291",
+      "lastPropertyId": "5:3968459840073216401",
+      "name": "PuzzleSettingsEntity",
+      "properties": [
+        {
+          "id": "1:6899116114219243456",
+          "name": "id",
+          "type": 6,
+          "flags": 129
+        },
+        {
+          "id": "2:5928782739152641707",
+          "name": "minRating",
+          "type": 6
+        },
+        {
+          "id": "3:3111244006932469180",
+          "name": "maxRating",
+          "type": 6
+        },
+        {
+          "id": "4:6880285838764420196",
+          "name": "randomMode",
+          "type": 1
+        },
+        {
+          "id": "5:3968459840073216401",
+          "name": "selectedMode",
+          "type": 9
+        }
+      ],
+      "relations": []
+    },
+    {
+      "id": "4:6471625215311251562",
+      "lastPropertyId": "4:2412049437298893951",
+      "name": "UserStoreMetaEntity",
+      "properties": [
+        {
+          "id": "1:5553487793611467981",
+          "name": "id",
+          "type": 6,
+          "flags": 129
+        },
+        {
+          "id": "2:36705763151100660",
+          "name": "schemaVersion",
+          "type": 6
+        },
+        {
+          "id": "3:4668062693663043145",
+          "name": "createdAtUtcMs",
+          "type": 6
+        },
+        {
+          "id": "4:2412049437298893951",
+          "name": "lastOpenedAtUtcMs",
+          "type": 6
+        }
+      ],
+      "relations": []
+    }
+  ],
+  "lastEntityId": "4:6471625215311251562",
+  "lastIndexId": "3:5537391396795520352",
+  "lastRelationId": "0:0",
+  "lastSequenceId": "0:0",
+  "modelVersion": 5,
+  "modelVersionParserMinimum": 5,
+  "retiredEntityUids": [],
+  "retiredIndexUids": [],
+  "retiredPropertyUids": [],
+  "retiredRelationUids": [],
+  "version": 1
+}
