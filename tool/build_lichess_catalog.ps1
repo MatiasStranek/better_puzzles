@@ -36,7 +36,7 @@ $arguments = @(
 )
 
 if ($null -ne $Limit) {
-    $arguments += @("--limit", $Limit.Value)
+    $arguments += @("--limit", [string]$Limit)
 }
 if ($Strict) {
     $arguments += "--strict"
