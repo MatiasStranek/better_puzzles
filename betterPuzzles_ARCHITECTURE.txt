@@ -1,3 +1,6 @@
+BUGS:
+	* fixing blue shading back to gray
+
 * Ranged PuzzleStreak: e.g. 30-40
 * Ranged Puzzles
 
