@@ -1,0 +1,7 @@
+* Ranged PuzzleStreak: e.g. 30-40
+* Ranged Puzzles
+
+Settings:
+	* TimeStamp (for PuzzleStorm)
+	* Range
+	* Random <-> Inkrement Button

@@ -1,0 +1,32 @@
+name: better_puzzles
+description: "Better Puzzles - offline Lichess puzzle trainer."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  flutter_svg: ^2.2.1
+  objectbox: ^5.3.2
+  objectbox_flutter_libs: ^5.3.2
+  path: ^1.9.1
+  path_provider: ^2.1.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.5.4
+  objectbox_generator: ^5.3.2
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/board/
+    - assets/pieces/
+    - assets/background/
