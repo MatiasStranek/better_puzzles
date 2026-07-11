@@ -104,4 +104,9 @@ class InMemoryPuzzleCatalogRepository implements PuzzleCatalogRepository {
   void resetCursors() {
     _cursor = 0;
   }
+
+  @override
+  void clearCaches() {
+    resetCursors();
+  }
 }

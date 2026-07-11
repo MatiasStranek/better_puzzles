@@ -1,7 +1,7 @@
 name: better_puzzles
 description: "Better Puzzles - offline Lichess puzzle trainer."
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.1.5+5
 
 environment:
   sdk: ^3.12.1

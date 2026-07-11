@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:bpuzzles_format/bpuzzles_format.dart';
 import 'package:flutter/material.dart';
@@ -79,6 +80,18 @@ class PuzzleAppController extends ChangeNotifier {
   DateTime? _runStartedAt;
   int _runRatingBefore = 1500;
   int _runGeneration = 0;
+  int _stormPlayerColor = DateTime.now().millisecondsSinceEpoch.isEven ? 0 : 1;
+
+  static const int _stormPrefetchTarget = 24;
+  static const int _streakPrefetchTarget = 12;
+  static const int _freeTaskPrefetchTarget = 8;
+  static const int _ratedTaskPrefetchTarget = 3;
+
+  final Map<int, _PrefetchedPuzzle> _runPrefetch = <int, _PrefetchedPuzzle>{};
+  final Queue<_PrefetchedPuzzle> _taskPrefetch = Queue<_PrefetchedPuzzle>();
+  final Set<int> _prefetchingGenerations = <int>{};
+  bool _lastPuzzleWasPrefetched = false;
+  bool _stormClockPausedForLoad = false;
 
   Timer? _stormTimer;
   DateTime? _stormDeadline;
@@ -124,6 +137,9 @@ class PuzzleAppController extends ChangeNotifier {
   PuzzleFeedback get feedback => _feedback;
   String get feedbackText => _feedbackText;
   int get lastQueryDurationMs => _lastQueryDurationMs;
+  bool get lastPuzzleWasPrefetched => _lastPuzzleWasPrefetched;
+  int get prefetchedPuzzleCount =>
+      _mode == PuzzleMode.tasks ? _taskPrefetch.length : _runPrefetch.length;
   int get lastStormModifierSeconds => _lastStormModifierSeconds;
   int get stormRemainingSeconds =>
       (_stormRemaining.inMilliseconds / 1000).ceil().clamp(0, 600).toInt();
@@ -300,10 +316,16 @@ class PuzzleAppController extends ChangeNotifier {
       return 'Datenbank vorbereiten';
     }
 
-    final queryInfo = _lastQueryDurationMs > 0
+    final queryInfo = _lastPuzzleWasPrefetched
+        ? ' · vorgeladen'
+        : _lastQueryDurationMs > 0
         ? ' · ${_lastQueryDurationMs}ms'
         : '';
-    return 'Puzzle ${puzzle.lichessPuzzleId} · ${puzzle.themes}$queryInfo';
+    final prefetchInfo = prefetchedPuzzleCount > 0
+        ? ' · ${prefetchedPuzzleCount} bereit'
+        : '';
+    return 'Puzzle ${puzzle.lichessPuzzleId} · ${puzzle.themes}'
+        '$queryInfo$prefetchInfo';
   }
 
   Future<void> attachStores(BetterPuzzlesStores stores) async {
@@ -420,6 +442,9 @@ class PuzzleAppController extends ChangeNotifier {
 
   Future<void> _setMode(PuzzleMode mode) async {
     _finishRun(completed: false);
+    if (mode == PuzzleMode.storm && _mode != PuzzleMode.storm) {
+      _stormPlayerColor = DateTime.now().millisecondsSinceEpoch.isEven ? 0 : 1;
+    }
     _mode = mode;
     _saveSettings();
     await _beginMode(resetCounters: true);
@@ -666,6 +691,10 @@ class PuzzleAppController extends ChangeNotifier {
   Future<void> _beginMode({required bool resetCounters}) async {
     _finishRun(completed: false);
     _runGeneration++;
+    _runPrefetch.clear();
+    _taskPrefetch.clear();
+    _lastPuzzleWasPrefetched = false;
+    _stormClockPausedForLoad = false;
     _stormTimer?.cancel();
     _stormTimer = null;
     _stormDeadline = null;
@@ -693,7 +722,7 @@ class PuzzleAppController extends ChangeNotifier {
       PuzzleMode.tasks => const <PuzzleSelection>[],
       PuzzleMode.streak => PuzzleModePlan.buildStreakSelections(),
       PuzzleMode.storm => PuzzleModePlan.buildStormSelections(
-        playerColor: DateTime.now().millisecondsSinceEpoch.isEven ? 0 : 1,
+        playerColor: _stormPlayerColor,
       ),
     };
 
@@ -723,28 +752,82 @@ class PuzzleAppController extends ChangeNotifier {
       return;
     }
 
+    final prefetched = _takePrefetchedPuzzle(selection);
+    if (prefetched != null) {
+      _applyLoadedPuzzle(
+        prefetched.puzzle,
+        queryDurationMs: prefetched.queryDurationMs,
+        wasPrefetched: true,
+      );
+      _schedulePrefetch();
+      return;
+    }
+
     _loadingPuzzle = true;
     _feedback = PuzzleFeedback.loading;
-    _feedbackText = 'Puzzle wird geladen …';
+    _feedbackText = _mode == PuzzleMode.storm
+        ? 'Storm lädt nach – Uhr pausiert …'
+        : 'Puzzle wird geladen …';
     _selectedSquare = null;
     _lastFrom = null;
     _lastTo = null;
     notifyListeners();
 
+    final pauseStarted = _pauseStormClockForDatabaseLoad();
     final stopwatch = Stopwatch()..start();
     PuzzleRecord? puzzle;
-    if (_mode == PuzzleMode.tasks && !_ratedTasks) {
-      puzzle = await _repository.nextPuzzle(range: _range, random: _randomMode);
-    } else {
-      puzzle = await _repository.selectPuzzle(selection);
+    Object? loadError;
+    StackTrace? loadStackTrace;
+
+    try {
+      if (_mode == PuzzleMode.tasks && !_ratedTasks) {
+        puzzle = await _repository.nextPuzzle(
+          range: _range,
+          random: _randomMode,
+        );
+      } else {
+        puzzle = await _repository.selectPuzzle(selection);
+      }
+    } on Object catch (error, stackTrace) {
+      loadError = error;
+      loadStackTrace = stackTrace;
+    } finally {
+      stopwatch.stop();
+      _resumeStormClockAfterDatabaseLoad(pauseStarted, generation: generation);
     }
-    stopwatch.stop();
 
     if (generation != _runGeneration) {
       return;
     }
 
-    _lastQueryDurationMs = stopwatch.elapsedMilliseconds;
+    if (loadError != null) {
+      debugPrint('Puzzle query failed: $loadError\n$loadStackTrace');
+      _loadingPuzzle = false;
+      _currentPuzzle = null;
+      _position = null;
+      _feedback = PuzzleFeedback.noPuzzle;
+      _feedbackText = 'Puzzle konnte nicht geladen werden';
+      _lastQueryDurationMs = stopwatch.elapsedMilliseconds;
+      _lastPuzzleWasPrefetched = false;
+      notifyListeners();
+      return;
+    }
+
+    _applyLoadedPuzzle(
+      puzzle,
+      queryDurationMs: stopwatch.elapsedMilliseconds,
+      wasPrefetched: false,
+    );
+    _schedulePrefetch();
+  }
+
+  void _applyLoadedPuzzle(
+    PuzzleRecord? puzzle, {
+    required int queryDurationMs,
+    required bool wasPrefetched,
+  }) {
+    _lastQueryDurationMs = queryDurationMs;
+    _lastPuzzleWasPrefetched = wasPrefetched;
     _loadingPuzzle = false;
     _currentPuzzle = puzzle;
     _solutionIndex = 0;
@@ -752,6 +835,9 @@ class PuzzleAppController extends ChangeNotifier {
     _currentResultRecorded = false;
     _puzzleStartedAt = DateTime.now().toUtc();
     _feedbackText = '';
+    _selectedSquare = null;
+    _lastFrom = null;
+    _lastTo = null;
 
     if (puzzle == null) {
       _position = null;
@@ -776,6 +862,187 @@ class PuzzleAppController extends ChangeNotifier {
     _playerIsWhite = _solverIsWhite;
     _feedback = PuzzleFeedback.idle;
     notifyListeners();
+  }
+
+  _PrefetchedPuzzle? _takePrefetchedPuzzle(PuzzleSelection selection) {
+    if (_mode != PuzzleMode.tasks) {
+      final value = _runPrefetch.remove(_runSelectionIndex);
+      if (value == null ||
+          _runPuzzleIds.contains(value.puzzle.lichessPuzzleId)) {
+        return null;
+      }
+      return value;
+    }
+
+    final requestedKey = _PuzzleSelectionFingerprint.fromSelection(selection);
+    while (_taskPrefetch.isNotEmpty) {
+      final value = _taskPrefetch.removeFirst();
+      if (!value.selectionKey.isCompatibleWith(requestedKey)) {
+        continue;
+      }
+      if (_runPuzzleIds.contains(value.puzzle.lichessPuzzleId)) {
+        continue;
+      }
+      return value;
+    }
+    return null;
+  }
+
+  void _schedulePrefetch() {
+    if (_runEnded || _currentPuzzle == null) {
+      return;
+    }
+
+    final generation = _runGeneration;
+    if (!_prefetchingGenerations.add(generation)) {
+      return;
+    }
+
+    unawaited(_runPrefetchWorker(generation));
+  }
+
+  Future<void> _runPrefetchWorker(int generation) async {
+    try {
+      if (_mode == PuzzleMode.tasks) {
+        await _fillTaskPrefetch(generation);
+      } else {
+        await _fillRunPrefetch(generation);
+      }
+    } on Object catch (error, stackTrace) {
+      // Prefetch is an optimization only. A failed background read must never
+      // terminate an otherwise playable run.
+      debugPrint('Puzzle prefetch failed: $error\n$stackTrace');
+    } finally {
+      _prefetchingGenerations.remove(generation);
+      if (generation == _runGeneration) {
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> _fillTaskPrefetch(int generation) async {
+    final selection = _selectionForCurrentSlot();
+    if (selection == null) {
+      return;
+    }
+
+    final selectionKey = _PuzzleSelectionFingerprint.fromSelection(selection);
+    if (_taskPrefetch.isNotEmpty &&
+        !_taskPrefetch.first.selectionKey.isCompatibleWith(selectionKey)) {
+      _taskPrefetch.clear();
+    }
+
+    final target = _ratedTasks
+        ? _ratedTaskPrefetchTarget
+        : _freeTaskPrefetchTarget;
+    final excluded = <String>{
+      ..._runPuzzleIds,
+      ..._taskPrefetch.map((value) => value.puzzle.lichessPuzzleId),
+    };
+
+    while (generation == _runGeneration &&
+        !_runEnded &&
+        _taskPrefetch.length < target) {
+      final stopwatch = Stopwatch()..start();
+      final puzzle = await _repository.selectPuzzle(
+        selection.copyWith(excludePuzzleIds: excluded),
+      );
+      stopwatch.stop();
+
+      if (generation != _runGeneration || puzzle == null) {
+        return;
+      }
+      if (!excluded.add(puzzle.lichessPuzzleId)) {
+        return;
+      }
+
+      _taskPrefetch.add(
+        _PrefetchedPuzzle(
+          puzzle: puzzle,
+          selectionKey: selectionKey,
+          queryDurationMs: stopwatch.elapsedMilliseconds,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+    }
+  }
+
+  Future<void> _fillRunPrefetch(int generation) async {
+    _runPrefetch.removeWhere((slot, _) => slot <= _runSelectionIndex);
+
+    final target = _mode == PuzzleMode.storm
+        ? _stormPrefetchTarget
+        : _streakPrefetchTarget;
+    final lastSlot = (_runSelectionIndex + target)
+        .clamp(0, _runSelections.length - 1)
+        .toInt();
+    final excluded = <String>{
+      ..._runPuzzleIds,
+      ..._runPrefetch.values.map((value) => value.puzzle.lichessPuzzleId),
+    };
+
+    for (
+      var slot = _runSelectionIndex + 1;
+      slot <= lastSlot && generation == _runGeneration && !_runEnded;
+      slot++
+    ) {
+      if (slot <= _runSelectionIndex || _runPrefetch.containsKey(slot)) {
+        continue;
+      }
+
+      final selection = _runSelections[slot].copyWith(
+        excludePuzzleIds: excluded,
+      );
+      final stopwatch = Stopwatch()..start();
+      final puzzle = await _repository.selectPuzzle(selection);
+      stopwatch.stop();
+
+      if (generation != _runGeneration || puzzle == null) {
+        return;
+      }
+      if (slot <= _runSelectionIndex) {
+        continue;
+      }
+      if (!excluded.add(puzzle.lichessPuzzleId)) {
+        continue;
+      }
+
+      _runPrefetch[slot] = _PrefetchedPuzzle(
+        puzzle: puzzle,
+        selectionKey: _PuzzleSelectionFingerprint.fromSelection(selection),
+        queryDurationMs: stopwatch.elapsedMilliseconds,
+      );
+      await Future<void>.delayed(Duration.zero);
+    }
+  }
+
+  DateTime? _pauseStormClockForDatabaseLoad() {
+    if (_mode != PuzzleMode.storm ||
+        !_stormStarted ||
+        _runEnded ||
+        _stormClockPausedForLoad) {
+      return null;
+    }
+
+    _stormClockPausedForLoad = true;
+    return DateTime.now();
+  }
+
+  void _resumeStormClockAfterDatabaseLoad(
+    DateTime? pauseStarted, {
+    required int generation,
+  }) {
+    if (pauseStarted == null || generation != _runGeneration) {
+      return;
+    }
+
+    final deadline = _stormDeadline;
+    if (deadline != null && !_runEnded) {
+      _stormDeadline = deadline.add(DateTime.now().difference(pauseStarted));
+      final remaining = _stormDeadline!.difference(DateTime.now());
+      _stormRemaining = remaining.isNegative ? Duration.zero : remaining;
+    }
+    _stormClockPausedForLoad = false;
   }
 
   PuzzleSelection? _selectionForCurrentSlot() {
@@ -963,7 +1230,7 @@ class PuzzleAppController extends ChangeNotifier {
     _stormDeadline = DateTime.now().add(_stormRemaining);
     _stormTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       final deadline = _stormDeadline;
-      if (deadline == null || _runEnded) {
+      if (deadline == null || _runEnded || _stormClockPausedForLoad) {
         return;
       }
 
@@ -1116,8 +1383,74 @@ class PuzzleAppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _runGeneration++;
+    _runPrefetch.clear();
+    _taskPrefetch.clear();
+    _repository.clearCaches();
     _stormTimer?.cancel();
     _finishRun(completed: false);
     super.dispose();
+  }
+}
+
+class _PrefetchedPuzzle {
+  const _PrefetchedPuzzle({
+    required this.puzzle,
+    required this.selectionKey,
+    required this.queryDurationMs,
+  });
+
+  final PuzzleRecord puzzle;
+  final _PuzzleSelectionFingerprint selectionKey;
+  final int queryDurationMs;
+}
+
+class _PuzzleSelectionFingerprint {
+  const _PuzzleSelectionFingerprint({
+    required this.minRating,
+    required this.maxRating,
+    required this.targetRatingBand,
+    required this.random,
+    required this.maxRatingDeviation,
+    required this.minPopularity,
+    required this.minPlays,
+    required this.playerColor,
+  });
+
+  factory _PuzzleSelectionFingerprint.fromSelection(PuzzleSelection selection) {
+    final target = selection.targetRating;
+    return _PuzzleSelectionFingerprint(
+      // Rated training moves its target by only a few points per puzzle. A
+      // 50-point band keeps a small prefetched queue valid without noticeably
+      // changing the requested difficulty.
+      minRating: target == null ? selection.minRating : null,
+      maxRating: target == null ? selection.maxRating : null,
+      targetRatingBand: target == null ? null : target ~/ 50,
+      random: selection.random,
+      maxRatingDeviation: selection.maxRatingDeviation,
+      minPopularity: selection.minPopularity,
+      minPlays: selection.minPlays,
+      playerColor: selection.playerColor,
+    );
+  }
+
+  final int? minRating;
+  final int? maxRating;
+  final int? targetRatingBand;
+  final bool random;
+  final int? maxRatingDeviation;
+  final int? minPopularity;
+  final int? minPlays;
+  final int? playerColor;
+
+  bool isCompatibleWith(_PuzzleSelectionFingerprint other) {
+    return minRating == other.minRating &&
+        maxRating == other.maxRating &&
+        targetRatingBand == other.targetRatingBand &&
+        random == other.random &&
+        maxRatingDeviation == other.maxRatingDeviation &&
+        minPopularity == other.minPopularity &&
+        minPlays == other.minPlays &&
+        playerColor == other.playerColor;
   }
 }

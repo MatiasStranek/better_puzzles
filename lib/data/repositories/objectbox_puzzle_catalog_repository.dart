@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:collection';
 import 'dart:math';
 
 import 'package:objectbox/objectbox.dart';
@@ -10,16 +12,36 @@ import '../../domain/puzzle_selection.dart';
 import '../stores/puzzle_catalog_store_manager.dart';
 import 'puzzle_catalog_repository.dart';
 
+/// Read-only repository for the large puzzle catalog.
+///
+/// Performance notes:
+/// - Random selection is intentionally based on an exact indexed rating.
+/// - Matching ObjectBox IDs are cached per rating/filter combination.
+/// - No query orders the complete catalog by [PuzzleEntity.randomKey].
+/// - Entity reads use ObjectBox's worker-isolate APIs.
+///
+/// This keeps the existing catalog format compatible while avoiding the large
+/// range scans that are especially costly on Android storage.
 class ObjectBoxPuzzleCatalogRepository implements PuzzleCatalogRepository {
-  ObjectBoxPuzzleCatalogRepository({required this.storeManager, Random? random})
-    : _random = random ?? Random();
+  ObjectBoxPuzzleCatalogRepository({
+    required this.storeManager,
+    Random? random,
+    int maxCachedRatingQueries = 384,
+  }) : _random = random ?? Random(),
+       _maxCachedRatingQueries = maxCachedRatingQueries;
 
   final PuzzleCatalogStoreManager storeManager;
   final Random _random;
+  final int _maxCachedRatingQueries;
+
+  final LinkedHashMap<_CandidateCacheKey, List<int>> _candidateIdCache =
+      LinkedHashMap<_CandidateCacheKey, List<int>>();
 
   int? _lastAscendingRating;
   int? _lastAscendingId;
   PuzzleRange? _lastAscendingRange;
+  Future<void> _ascendingBarrier = Future<void>.value();
+  int _ascendingEpoch = 0;
 
   @override
   Future<PuzzleRecord?> nextPuzzle({
@@ -63,40 +85,74 @@ class ObjectBoxPuzzleCatalogRepository implements PuzzleCatalogRepository {
 
   @override
   void resetCursors() {
+    _ascendingEpoch++;
     _lastAscendingRating = null;
     _lastAscendingId = null;
     _lastAscendingRange = null;
+
+    // Deliberately keep the rating-ID cache. It is tied to this repository and
+    // therefore to one open catalog. Keeping it makes mode resets and repeated
+    // Storm/Streak starts effectively warm operations.
+  }
+
+  @override
+  void clearCaches() {
+    resetCursors();
+    _candidateIdCache.clear();
   }
 
   Future<PuzzleEntity?> _findRandom(PuzzleSelection selection) async {
-    final attempts = <PuzzleSelection>[
+    final strictResult = await _findRandomWithFilters(
       selection,
-      if (selection.minPopularity != null || selection.minPlays != null)
-        selection.copyWith(clearMinPopularity: true, clearMinPlays: true),
-      if (selection.maxRatingDeviation != null)
-        selection.copyWith(
-          clearMinPopularity: true,
-          clearMinPlays: true,
-          clearMaxRatingDeviation: true,
-        ),
-    ];
+      nearRadiusLimit: 12,
+      randomSampleLimit: 4,
+      exhaustiveSmallRanges: false,
+    );
+    if (strictResult != null) {
+      return strictResult;
+    }
 
-    for (final attempt in attempts) {
-      final result = await _findRandomWithFilters(attempt);
+    final withoutPopularity = selection.copyWith(
+      clearMinPopularity: true,
+      clearMinPlays: true,
+    );
+    if (selection.minPopularity != null || selection.minPlays != null) {
+      final result = await _findRandomWithFilters(
+        withoutPopularity,
+        nearRadiusLimit: 24,
+        randomSampleLimit: 8,
+        exhaustiveSmallRanges: false,
+      );
       if (result != null) {
         return result;
       }
     }
 
-    return null;
+    final broadSelection = selection.copyWith(
+      clearMinPopularity: true,
+      clearMinPlays: true,
+      clearMaxRatingDeviation: true,
+    );
+    return _findRandomWithFilters(
+      broadSelection,
+      nearRadiusLimit: 96,
+      randomSampleLimit: 32,
+      exhaustiveSmallRanges: true,
+    );
   }
 
   Future<PuzzleEntity?> _findRandomWithFilters(
-    PuzzleSelection selection,
-  ) async {
-    final candidates = _ratingCandidates(selection);
-
-    for (final rating in candidates) {
+    PuzzleSelection selection, {
+    required int nearRadiusLimit,
+    required int randomSampleLimit,
+    required bool exhaustiveSmallRanges,
+  }) async {
+    for (final rating in _ratingCandidates(
+      selection,
+      nearRadiusLimit: nearRadiusLimit,
+      randomSampleLimit: randomSampleLimit,
+      exhaustiveSmallRanges: exhaustiveSmallRanges,
+    )) {
       final result = await _findAtExactRating(
         selection: selection,
         rating: rating,
@@ -109,42 +165,72 @@ class ObjectBoxPuzzleCatalogRepository implements PuzzleCatalogRepository {
     return null;
   }
 
-  Iterable<int> _ratingCandidates(PuzzleSelection selection) sync* {
-    final min = selection.minRating;
-    final max = selection.maxRating;
+  /// Produces a bounded, target-first rating search.
+  ///
+  /// Strict quality filters only inspect a small neighborhood. If that misses,
+  /// the caller relaxes filters before doing a broader pass. This prevents a
+  /// rare exact rating from triggering hundreds of expensive negative queries.
+  Iterable<int> _ratingCandidates(
+    PuzzleSelection selection, {
+    required int nearRadiusLimit,
+    required int randomSampleLimit,
+    required bool exhaustiveSmallRanges,
+  }) sync* {
+    final minRating = selection.minRating;
+    final maxRating = selection.maxRating;
+    final span = maxRating - minRating + 1;
     final target =
-        (selection.targetRating ?? (min + _random.nextInt(max - min + 1)))
-            .clamp(min, max)
+        (selection.targetRating ??
+                (minRating + _random.nextInt(maxRating - minRating + 1)))
+            .clamp(minRating, maxRating)
             .toInt();
     final yielded = <int>{};
 
-    void addCandidate(int value, List<int> output) {
-      if (value >= min && value <= max && yielded.add(value)) {
-        output.add(value);
-      }
+    bool add(int value) {
+      return value >= minRating && value <= maxRating && yielded.add(value);
     }
 
-    final firstWave = <int>[];
-    addCandidate(target, firstWave);
-    for (var offset = 1; offset <= 40; offset++) {
+    if (add(target)) {
+      yield target;
+    }
+
+    final nearRadius = min(nearRadiusLimit, max(0, span - 1));
+    for (var offset = 1; offset <= nearRadius; offset++) {
       if (_random.nextBool()) {
-        addCandidate(target + offset, firstWave);
-        addCandidate(target - offset, firstWave);
+        if (add(target + offset)) yield target + offset;
+        if (add(target - offset)) yield target - offset;
       } else {
-        addCandidate(target - offset, firstWave);
-        addCandidate(target + offset, firstWave);
+        if (add(target - offset)) yield target - offset;
+        if (add(target + offset)) yield target + offset;
       }
     }
-    yield* firstWave;
 
-    final randomWave = <int>[];
-    for (var index = 0; index < 32; index++) {
-      addCandidate(min + _random.nextInt(max - min + 1), randomWave);
+    final randomSamples = min(randomSampleLimit, span);
+    for (var index = 0; index < randomSamples; index++) {
+      final rating = minRating + _random.nextInt(span);
+      if (add(rating)) {
+        yield rating;
+      }
     }
-    yield* randomWave;
 
-    for (var rating = min; rating <= max; rating++) {
-      if (yielded.add(rating)) {
+    if (exhaustiveSmallRanges && span <= 320) {
+      for (var rating = minRating; rating <= maxRating; rating++) {
+        if (add(rating)) {
+          yield rating;
+        }
+      }
+      return;
+    }
+
+    if (!exhaustiveSmallRanges || span <= 320) {
+      return;
+    }
+
+    const coarseSamples = 64;
+    for (var index = 0; index < coarseSamples; index++) {
+      final fraction = (index + 0.5) / coarseSamples;
+      final rating = minRating + ((span - 1) * fraction).round();
+      if (add(rating)) {
         yield rating;
       }
     }
@@ -154,41 +240,72 @@ class ObjectBoxPuzzleCatalogRepository implements PuzzleCatalogRepository {
     required PuzzleSelection selection,
     required int rating,
   }) async {
-    final pivot = _nextPositive63BitInt();
-    final afterPivot =
-        _conditionForSelection(selection, rating) &
-        catalog_obx.PuzzleEntity_.randomKey.greaterThan(pivot);
+    final ids = await _candidateIdsForRating(
+      selection: selection,
+      rating: rating,
+    );
+    if (ids.isEmpty) {
+      return null;
+    }
 
-    var query = storeManager.puzzleBox
-        .query(afterPivot)
-        .order(catalog_obx.PuzzleEntity_.randomKey)
+    final excluded = selection.excludePuzzleIds;
+    final start = _random.nextInt(ids.length);
+
+    // Usually the first ID is usable. The circular walk only matters when a
+    // run has already consumed some puzzles from the cached rating list.
+    for (var offset = 0; offset < ids.length; offset++) {
+      final id = ids[(start + offset) % ids.length];
+      final entity = await storeManager.puzzleBox.getAsync(id);
+      if (entity != null && !excluded.contains(entity.lichessPuzzleId)) {
+        return entity;
+      }
+    }
+
+    return null;
+  }
+
+  Future<List<int>> _candidateIdsForRating({
+    required PuzzleSelection selection,
+    required int rating,
+  }) async {
+    final key = _CandidateCacheKey(
+      rating: rating,
+      maxRatingDeviation: selection.maxRatingDeviation,
+      minPopularity: selection.minPopularity,
+      minPlays: selection.minPlays,
+      playerColor: selection.playerColor,
+    );
+
+    final cached = _candidateIdCache.remove(key);
+    if (cached != null) {
+      // Reinsert to maintain least-recently-used order.
+      _candidateIdCache[key] = cached;
+      return cached;
+    }
+
+    final query = storeManager.puzzleBox
+        .query(_conditionForSelection(selection, rating))
         .build();
-    query.limit = 12;
 
     try {
-      final values = await query.findAsync();
-      final result = _firstNotExcluded(values, selection.excludePuzzleIds);
-      if (result != null) {
-        return result;
-      }
+      final ids = await query.findIdsAsync();
+      ids.sort();
+      final immutable = List<int>.unmodifiable(ids);
+      _cacheCandidateIds(key, immutable);
+      return immutable;
     } finally {
       query.close();
     }
+  }
 
-    final beforePivot =
-        _conditionForSelection(selection, rating) &
-        catalog_obx.PuzzleEntity_.randomKey.lessThan(pivot + 1);
-    query = storeManager.puzzleBox
-        .query(beforePivot)
-        .order(catalog_obx.PuzzleEntity_.randomKey)
-        .build();
-    query.limit = 12;
+  void _cacheCandidateIds(_CandidateCacheKey key, List<int> ids) {
+    if (_maxCachedRatingQueries <= 0) {
+      return;
+    }
 
-    try {
-      final values = await query.findAsync();
-      return _firstNotExcluded(values, selection.excludePuzzleIds);
-    } finally {
-      query.close();
+    _candidateIdCache[key] = ids;
+    while (_candidateIdCache.length > _maxCachedRatingQueries) {
+      _candidateIdCache.remove(_candidateIdCache.keys.first);
     }
   }
 
@@ -230,19 +347,26 @@ class ObjectBoxPuzzleCatalogRepository implements PuzzleCatalogRepository {
     return condition;
   }
 
-  PuzzleEntity? _firstNotExcluded(
-    List<PuzzleEntity> values,
-    Set<String> excluded,
-  ) {
-    for (final value in values) {
-      if (!excluded.contains(value.lichessPuzzleId)) {
-        return value;
+  Future<PuzzleEntity?> _findAscending(PuzzleRange range) {
+    final completer = Completer<PuzzleEntity?>();
+    final epoch = _ascendingEpoch;
+    _ascendingBarrier = _ascendingBarrier.then((_) async {
+      try {
+        completer.complete(await _findAscendingUnlocked(range, epoch));
+      } on Object catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
       }
-    }
-    return null;
+    });
+    return completer.future;
   }
 
-  Future<PuzzleEntity?> _findAscending(PuzzleRange range) async {
+  Future<PuzzleEntity?> _findAscendingUnlocked(
+    PuzzleRange range,
+    int epoch,
+  ) async {
+    if (epoch != _ascendingEpoch) {
+      return null;
+    }
     if (_lastAscendingRange != range) {
       _lastAscendingRange = range;
       _lastAscendingRating = null;
@@ -253,26 +377,30 @@ class ObjectBoxPuzzleCatalogRepository implements PuzzleCatalogRepository {
     var afterId = _lastAscendingId ?? 0;
 
     while (rating <= range.maxRating) {
-      var condition = catalog_obx.PuzzleEntity_.rating.equals(rating);
-      if (afterId > 0) {
-        condition =
-            condition & catalog_obx.PuzzleEntity_.id.greaterThan(afterId);
+      if (epoch != _ascendingEpoch) {
+        return null;
       }
+      final ids = await _candidateIdsForRating(
+        selection: PuzzleSelection(
+          minRating: rating,
+          maxRating: rating,
+          random: false,
+        ),
+        rating: rating,
+      );
 
-      final query = storeManager.puzzleBox
-          .query(condition)
-          .order(catalog_obx.PuzzleEntity_.id)
-          .build();
-
-      try {
-        final result = await query.findFirstAsync();
-        if (result != null) {
-          _lastAscendingRating = rating;
-          _lastAscendingId = result.id;
-          return result;
+      final index = _firstIndexGreaterThan(ids, afterId);
+      if (index < ids.length) {
+        final id = ids[index];
+        final entity = await storeManager.puzzleBox.getAsync(id);
+        if (epoch != _ascendingEpoch) {
+          return null;
         }
-      } finally {
-        query.close();
+        if (entity != null) {
+          _lastAscendingRating = rating;
+          _lastAscendingId = id;
+          return entity;
+        }
       }
 
       rating++;
@@ -286,29 +414,52 @@ class ObjectBoxPuzzleCatalogRepository implements PuzzleCatalogRepository {
       return null;
     }
 
-    final query = storeManager.puzzleBox
-        .query(catalog_obx.PuzzleEntity_.rating.equals(range.minRating))
-        .order(catalog_obx.PuzzleEntity_.id)
-        .build();
-    try {
-      final result = await query.findFirstAsync();
-      if (result != null) {
-        _lastAscendingRating = range.minRating;
-        _lastAscendingId = result.id;
+    // Wrap once to the first available exact rating in the configured range.
+    for (
+      var wrapRating = range.minRating;
+      wrapRating <= range.maxRating;
+      wrapRating++
+    ) {
+      if (epoch != _ascendingEpoch) {
+        return null;
       }
-      return result;
-    } finally {
-      query.close();
+      final ids = await _candidateIdsForRating(
+        selection: PuzzleSelection(
+          minRating: wrapRating,
+          maxRating: wrapRating,
+          random: false,
+        ),
+        rating: wrapRating,
+      );
+      if (ids.isEmpty) {
+        continue;
+      }
+
+      final entity = await storeManager.puzzleBox.getAsync(ids.first);
+      if (epoch != _ascendingEpoch) {
+        return null;
+      }
+      if (entity != null) {
+        _lastAscendingRating = wrapRating;
+        _lastAscendingId = entity.id;
+        return entity;
+      }
     }
+    return null;
   }
 
-  int _nextPositive63BitInt() {
-    final high = _random.nextInt(1 << 21);
-    final middle = _random.nextInt(1 << 21);
-    final low = _random.nextInt(1 << 21);
-    final value = (high << 42) | (middle << 21) | low;
-    const maxSafePivot = 0x7FFFFFFFFFFFFFFE;
-    return value > maxSafePivot ? maxSafePivot : value;
+  int _firstIndexGreaterThan(List<int> sortedIds, int value) {
+    var low = 0;
+    var high = sortedIds.length;
+    while (low < high) {
+      final middle = low + ((high - low) >> 1);
+      if (sortedIds[middle] <= value) {
+        low = middle + 1;
+      } else {
+        high = middle;
+      }
+    }
+    return low;
   }
 
   PuzzleRecord _toRecord(PuzzleEntity entity) {
@@ -325,4 +476,39 @@ class ObjectBoxPuzzleCatalogRepository implements PuzzleCatalogRepository {
       playerColor: entity.playerColor,
     );
   }
+}
+
+class _CandidateCacheKey {
+  const _CandidateCacheKey({
+    required this.rating,
+    required this.maxRatingDeviation,
+    required this.minPopularity,
+    required this.minPlays,
+    required this.playerColor,
+  });
+
+  final int rating;
+  final int? maxRatingDeviation;
+  final int? minPopularity;
+  final int? minPlays;
+  final int? playerColor;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _CandidateCacheKey &&
+        other.rating == rating &&
+        other.maxRatingDeviation == maxRatingDeviation &&
+        other.minPopularity == minPopularity &&
+        other.minPlays == minPlays &&
+        other.playerColor == playerColor;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    rating,
+    maxRatingDeviation,
+    minPopularity,
+    minPlays,
+    playerColor,
+  );
 }
