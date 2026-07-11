@@ -1,8 +1,11 @@
+import 'package:bpuzzles_format/bpuzzles_format.dart';
 import 'package:flutter/material.dart';
 
 import '../data/import/puzzle_database_import_service.dart';
 import '../data/repositories/in_memory_puzzle_catalog_repository.dart';
+import '../data/repositories/objectbox_puzzle_catalog_repository.dart';
 import '../data/repositories/puzzle_catalog_repository.dart';
+import '../data/stores/better_puzzles_stores.dart';
 import '../domain/puzzle_database_status.dart';
 import '../domain/puzzle_mode.dart';
 import '../domain/puzzle_range.dart';
@@ -14,13 +17,14 @@ class PuzzleAppController extends ChangeNotifier {
   PuzzleAppController({
     PuzzleCatalogRepository? repository,
     PuzzleDatabaseImportService? importService,
-  })  : _repository = repository ?? InMemoryPuzzleCatalogRepository(),
-        _importService = importService ?? const PuzzleDatabaseImportService() {
+  }) : _repository = repository ?? InMemoryPuzzleCatalogRepository(),
+       _importService = importService ?? const PuzzleDatabaseImportService() {
     loadNextPuzzle();
   }
 
-  final PuzzleCatalogRepository _repository;
-  final PuzzleDatabaseImportService _importService;
+  PuzzleCatalogRepository _repository;
+  PuzzleDatabaseImportService _importService;
+  BetterPuzzlesStores? _stores;
 
   PuzzleMode _mode = PuzzleMode.tasks;
   PuzzleRange _range = const PuzzleRange(minRating: 600, maxRating: 1600);
@@ -35,6 +39,11 @@ class PuzzleAppController extends ChangeNotifier {
   int _mistakes = 0;
   int _streak = 0;
 
+  bool _databaseBusy = false;
+  String _databaseActivity = '';
+  double? _databaseImportProgress;
+  String? _databaseInitializationError;
+
   PuzzleMode get mode => _mode;
   PuzzleRange get range => _range;
   bool get randomMode => _randomMode;
@@ -45,6 +54,11 @@ class PuzzleAppController extends ChangeNotifier {
   int get score => _score;
   int get mistakes => _mistakes;
   int get streak => _streak;
+  bool get databaseReady => _stores != null;
+  bool get databaseBusy => _databaseBusy;
+  String get databaseActivity => _databaseActivity;
+  double? get databaseImportProgress => _databaseImportProgress;
+  String? get databaseInitializationError => _databaseInitializationError;
 
   String get boardFen {
     return _currentPuzzle?.puzzleFen ??
@@ -114,6 +128,99 @@ class PuzzleAppController extends ChangeNotifier {
     return 'Puzzle ${puzzle.lichessPuzzleId} · ${puzzle.themes}';
   }
 
+  Future<void> attachStores(BetterPuzzlesStores stores) async {
+    _stores = stores;
+    _importService = stores.importService;
+    _databaseInitializationError = null;
+
+    final manifest = stores.activeManifest;
+    if (manifest == null || !stores.catalogStore.isOpen) {
+      _databaseStatus = const PuzzleDatabaseStatus.missing();
+      notifyListeners();
+      return;
+    }
+
+    _repository = ObjectBoxPuzzleCatalogRepository(
+      storeManager: stores.catalogStore,
+    );
+    _databaseStatus = _statusFromManifest(
+      manifest,
+      label: '${manifest.displayName} ist aktiv',
+    );
+    await loadNextPuzzle();
+  }
+
+  void setDatabaseInitializationError(Object error) {
+    _databaseInitializationError = error.toString();
+    _databaseStatus = PuzzleDatabaseStatus(
+      isAvailable: false,
+      label: 'Datenbank konnte nicht geöffnet werden',
+      sourceName: error.toString(),
+    );
+    notifyListeners();
+  }
+
+  Future<PuzzleCatalogPackageInspection> inspectPuzzleCatalog(
+    String packagePath,
+  ) {
+    return _importService.inspectPackage(packagePath);
+  }
+
+  Future<PuzzleDatabaseImportResult> importPuzzleCatalog(
+    String packagePath,
+  ) async {
+    final stores = _stores;
+    if (stores == null) {
+      throw StateError('Die App-Speicher sind noch nicht initialisiert');
+    }
+    if (_databaseBusy) {
+      throw StateError('Es läuft bereits ein Datenbankimport');
+    }
+
+    _databaseBusy = true;
+    _databaseActivity = 'Import wird vorbereitet';
+    _databaseImportProgress = 0;
+    notifyListeners();
+
+    PuzzleDatabaseImportResult? completed;
+
+    try {
+      await for (final event in _importService.importPackage(
+        packagePath,
+        onProgress: _applyImportEvent,
+      )) {
+        _applyImportEvent(event);
+        completed = event.result ?? completed;
+      }
+
+      final result = completed;
+      final manifest = result?.manifest;
+      if (result == null || manifest == null) {
+        throw StateError('Der Import wurde nicht vollständig abgeschlossen');
+      }
+      if (!stores.catalogStore.isOpen) {
+        throw StateError('Der importierte PuzzleCatalogStore ist nicht offen');
+      }
+
+      _repository = ObjectBoxPuzzleCatalogRepository(
+        storeManager: stores.catalogStore,
+      );
+      _databaseStatus = _statusFromManifest(
+        manifest,
+        label: '${manifest.displayName} ist aktiv',
+      );
+      await loadNextPuzzle();
+      return result;
+    } on Object {
+      _databaseActivity = 'Import fehlgeschlagen';
+      rethrow;
+    } finally {
+      _databaseBusy = false;
+      _databaseImportProgress = null;
+      notifyListeners();
+    }
+  }
+
   void setMode(PuzzleMode mode) {
     if (_mode == mode) {
       return;
@@ -162,10 +269,17 @@ class PuzzleAppController extends ChangeNotifier {
     _lastFrom = null;
     _lastTo = null;
 
-    _currentPuzzle = await _repository.nextPuzzle(
+    final repository = _repository;
+    final puzzle = await repository.nextPuzzle(
       range: _range,
       random: _randomMode,
     );
+
+    if (!identical(repository, _repository)) {
+      return;
+    }
+
+    _currentPuzzle = puzzle;
 
     final playerColor = _currentPuzzle?.playerColor;
     if (playerColor != null) {
@@ -201,10 +315,7 @@ class PuzzleAppController extends ChangeNotifier {
     return piecesBySquare.containsKey(square);
   }
 
-  bool canMoveTo({
-    required String from,
-    required String to,
-  }) {
+  bool canMoveTo({required String from, required String to}) {
     return from != to;
   }
 
@@ -255,6 +366,43 @@ class PuzzleAppController extends ChangeNotifier {
     _mistakes = 0;
     _streak = 0;
     loadNextPuzzle();
+  }
+
+  void _applyImportEvent(PuzzleCatalogImportEvent event) {
+    _databaseActivity = event.message;
+    _databaseImportProgress = _overallImportProgress(event);
+    notifyListeners();
+  }
+
+  double _overallImportProgress(PuzzleCatalogImportEvent event) {
+    final phaseProgress = (event.progress ?? 0).clamp(0.0, 1.0).toDouble();
+
+    return switch (event.phase) {
+      PuzzleCatalogImportPhase.inspecting => 0.01,
+      PuzzleCatalogImportPhase.preparingStaging => 0.03,
+      PuzzleCatalogImportPhase.copyingPackage => 0.03 + (phaseProgress * 0.42),
+      PuzzleCatalogImportPhase.extracting => 0.45 + (phaseProgress * 0.42),
+      PuzzleCatalogImportPhase.verifyingObjectBox => 0.90,
+      PuzzleCatalogImportPhase.activating => 0.95,
+      PuzzleCatalogImportPhase.openingCatalog => 0.98,
+      PuzzleCatalogImportPhase.completed => 1.0,
+    };
+  }
+
+  PuzzleDatabaseStatus _statusFromManifest(
+    BPuzzlesManifest manifest, {
+    required String label,
+  }) {
+    return PuzzleDatabaseStatus(
+      isAvailable: true,
+      label: label,
+      puzzleCount: manifest.puzzleCount,
+      sourceName: manifest.source.name,
+      importedAtMs: DateTime.now().millisecondsSinceEpoch,
+      catalogId: manifest.catalogId,
+      minRating: manifest.minRating,
+      maxRating: manifest.maxRating,
+    );
   }
 
   List<String> _demoLegalTargets() {

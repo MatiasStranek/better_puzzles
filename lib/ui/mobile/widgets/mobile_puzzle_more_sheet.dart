@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../controllers/puzzle_app_controller.dart';
+import '../../shared/puzzle_database_import_dialog.dart';
 
 class MobilePuzzleMoreSheet extends StatelessWidget {
-  const MobilePuzzleMoreSheet({
-    super.key,
-    required this.controller,
-  });
+  const MobilePuzzleMoreSheet({super.key, required this.controller});
 
   final PuzzleAppController controller;
 
@@ -60,10 +58,15 @@ class MobilePuzzleMoreSheet extends StatelessWidget {
               ),
               _SheetButton(
                 icon: Icons.storage_rounded,
-                label: 'Datenbank-Ordner vorbereiten',
-                onTap: () {
-                  controller.prepareDatabaseFolder();
-                  Navigator.of(context).pop();
+                label: 'Puzzle-Datenbank importieren',
+                onTap: () async {
+                  await showPuzzleDatabaseImportDialog(
+                    context: context,
+                    controller: controller,
+                  );
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
                 },
               ),
               _SheetButton(

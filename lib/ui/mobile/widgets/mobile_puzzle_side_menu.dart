@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../controllers/puzzle_app_controller.dart';
 import '../../../domain/puzzle_mode.dart';
 import '../../../domain/puzzle_range.dart';
+import '../../shared/puzzle_database_import_dialog.dart';
 
 class MobilePuzzleSideMenu extends StatelessWidget {
   const MobilePuzzleSideMenu({
@@ -203,16 +204,23 @@ class MobilePuzzleSideMenu extends StatelessWidget {
                                   ? 'Zufällig pro Puzzle'
                                   : 'Aufsteigend',
                               onTap: () {
-                                controller.setRandomMode(!controller.randomMode);
+                                controller.setRandomMode(
+                                  !controller.randomMode,
+                                );
                               },
                               isEnabled: isEnabled,
                             ),
                             _SideMenuButton(
                               icon: Icons.storage_rounded,
                               label: 'Datenbank',
-                              value: controller.databaseStatus.countLabel,
-                              onTap: () {
-                                controller.prepareDatabaseFolder();
+                              value: controller.databaseBusy
+                                  ? controller.databaseActivity
+                                  : controller.databaseStatus.countLabel,
+                              onTap: () async {
+                                await showPuzzleDatabaseImportDialog(
+                                  context: context,
+                                  controller: controller,
+                                );
                               },
                               isEnabled: isEnabled,
                             ),
@@ -220,7 +228,8 @@ class MobilePuzzleSideMenu extends StatelessWidget {
                               _SideMenuButton(
                                 icon: Icons.extension_rounded,
                                 label: 'Aktuelles Puzzle',
-                                value: '${puzzle.lichessPuzzleId} · ${puzzle.rating}',
+                                value:
+                                    '${puzzle.lichessPuzzleId} · ${puzzle.rating}',
                                 onTap: null,
                                 isEnabled: isEnabled,
                               ),
@@ -282,10 +291,7 @@ class MobilePuzzleSideMenu extends StatelessWidget {
 }
 
 class _RangeValue extends StatelessWidget {
-  const _RangeValue({
-    required this.label,
-    required this.value,
-  });
+  const _RangeValue({required this.label, required this.value});
 
   final String label;
   final int value;
@@ -337,8 +343,8 @@ class _SideMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = isEnabled
         ? isHighlighted
-            ? _accentColor
-            : Colors.white
+              ? _accentColor
+              : Colors.white
         : Colors.white.withAlpha(76);
 
     final valueColor = isEnabled
@@ -352,10 +358,7 @@ class _SideMenuButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 11),
         child: Row(
           children: [
-            SizedBox(
-              width: 46,
-              child: Icon(icon, size: 30, color: color),
-            ),
+            SizedBox(width: 46, child: Icon(icon, size: 30, color: color)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

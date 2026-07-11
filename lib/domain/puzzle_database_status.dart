@@ -5,20 +5,29 @@ class PuzzleDatabaseStatus {
     this.puzzleCount,
     this.sourceName,
     this.importedAtMs,
+    this.catalogId,
+    this.minRating,
+    this.maxRating,
   });
 
   const PuzzleDatabaseStatus.missing()
-      : isAvailable = false,
-        label = 'Keine Puzzle-Datenbank importiert',
-        puzzleCount = null,
-        sourceName = null,
-        importedAtMs = null;
+    : isAvailable = false,
+      label = 'Keine Puzzle-Datenbank importiert',
+      puzzleCount = null,
+      sourceName = null,
+      importedAtMs = null,
+      catalogId = null,
+      minRating = null,
+      maxRating = null;
 
   final bool isAvailable;
   final String label;
   final int? puzzleCount;
   final String? sourceName;
   final int? importedAtMs;
+  final String? catalogId;
+  final int? minRating;
+  final int? maxRating;
 
   String get countLabel {
     final count = puzzleCount;
@@ -28,6 +37,17 @@ class PuzzleDatabaseStatus {
     }
 
     return '${_formatCount(count)} Puzzles';
+  }
+
+  String get ratingLabel {
+    final minimum = minRating;
+    final maximum = maxRating;
+
+    if (minimum == null || maximum == null) {
+      return 'Rating unbekannt';
+    }
+
+    return '$minimum–$maximum Elo';
   }
 
   String _formatCount(int value) {

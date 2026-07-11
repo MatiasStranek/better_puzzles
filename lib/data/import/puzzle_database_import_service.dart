@@ -73,7 +73,10 @@ class PuzzleDatabaseImportService {
     );
   }
 
-  Stream<PuzzleCatalogImportEvent> importPackage(String packagePath) async* {
+  Stream<PuzzleCatalogImportEvent> importPackage(
+    String packagePath, {
+    void Function(PuzzleCatalogImportEvent event)? onProgress,
+  }) async* {
     yield const PuzzleCatalogImportEvent(
       phase: PuzzleCatalogImportPhase.inspecting,
       message: 'Paket und Manifest werden geprüft',
@@ -124,9 +127,24 @@ class PuzzleDatabaseImportService {
       yield const PuzzleCatalogImportEvent(
         phase: PuzzleCatalogImportPhase.copyingPackage,
         message: 'Paket wird in den geschützten App-Importordner kopiert',
+        progress: 0,
       );
 
-      await _copyFileStreaming(source: packageFile, target: stagedPackage);
+      await _copyFileStreaming(
+        source: packageFile,
+        target: stagedPackage,
+        onProgress: (copiedBytes, totalBytes) {
+          onProgress?.call(
+            PuzzleCatalogImportEvent(
+              phase: PuzzleCatalogImportPhase.copyingPackage,
+              message:
+                  'Paket wird kopiert: '
+                  '${_formatPercent(copiedBytes, totalBytes)}',
+              progress: copiedBytes / totalBytes,
+            ),
+          );
+        },
+      );
       final stagedHeader = await reader.inspect(stagedPackage);
       final stagedErrors = stagedHeader.manifest.validate(
         expectedModelFingerprint: catalogModelFingerprint,
@@ -147,10 +165,26 @@ class PuzzleDatabaseImportService {
         progress: 0,
       );
 
+      var lastExtractPercent = -1;
       await reader.extractDatabase(
         packageFile: stagedPackage,
         header: stagedHeader,
         targetFile: stagingDatabase,
+        onProgress: (copiedBytes, totalBytes) {
+          final percent = _percent(copiedBytes, totalBytes);
+          if (percent == lastExtractPercent) {
+            return;
+          }
+          lastExtractPercent = percent;
+
+          onProgress?.call(
+            PuzzleCatalogImportEvent(
+              phase: PuzzleCatalogImportPhase.extracting,
+              message: 'ObjectBox-Datenbank wird extrahiert: $percent %',
+              progress: copiedBytes / totalBytes,
+            ),
+          );
+        },
       );
 
       yield const PuzzleCatalogImportEvent(
@@ -308,24 +342,64 @@ class PuzzleDatabaseImportService {
   Future<void> _copyFileStreaming({
     required File source,
     required File target,
+    void Function(int copiedBytes, int totalBytes)? onProgress,
   }) async {
     final temporary = File('${target.path}.partial');
     if (await temporary.exists()) {
       await temporary.delete();
     }
 
+    final totalBytes = await source.length();
+    var copiedBytes = 0;
+    var lastReportedPercent = -1;
     final sink = temporary.openWrite();
+
     try {
-      await sink.addStream(source.openRead());
+      await for (final chunk in source.openRead()) {
+        sink.add(chunk);
+        copiedBytes += chunk.length;
+
+        final percent = _percent(copiedBytes, totalBytes);
+        if (percent != lastReportedPercent) {
+          lastReportedPercent = percent;
+          onProgress?.call(copiedBytes, totalBytes);
+        }
+      }
       await sink.flush();
     } finally {
       await sink.close();
+    }
+
+    if (copiedBytes != totalBytes) {
+      await _deleteIfExists(temporary);
+      throw FileSystemException(
+        'Paket wurde nicht vollständig kopiert',
+        source.path,
+      );
     }
 
     if (await target.exists()) {
       await target.delete();
     }
     await temporary.rename(target.path);
+  }
+
+  String _formatPercent(int copiedBytes, int totalBytes) {
+    return '${_percent(copiedBytes, totalBytes)} %';
+  }
+
+  int _percent(int copiedBytes, int totalBytes) {
+    if (totalBytes <= 0) {
+      return 0;
+    }
+
+    return ((copiedBytes * 100) ~/ totalBytes).clamp(0, 100).toInt();
+  }
+
+  Future<void> _deleteIfExists(File file) async {
+    if (await file.exists()) {
+      await file.delete();
+    }
   }
 
   Future<void> _restorePreviousCatalog({
