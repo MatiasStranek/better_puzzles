@@ -5,6 +5,9 @@ class PuzzleRecord {
     required this.setupMoveUci,
     required this.solutionMovesUci,
     required this.rating,
+    required this.ratingDeviation,
+    required this.popularity,
+    required this.nbPlays,
     required this.themes,
     required this.playerColor,
   });
@@ -14,6 +17,9 @@ class PuzzleRecord {
   final String setupMoveUci;
   final String solutionMovesUci;
   final int rating;
+  final int ratingDeviation;
+  final int popularity;
+  final int nbPlays;
   final String themes;
 
   /// 0 = Weiß löst, 1 = Schwarz löst.

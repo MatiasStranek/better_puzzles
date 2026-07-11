@@ -66,7 +66,7 @@
     },
     {
       "id": "2:623527614888720126",
-      "lastPropertyId": "11:149959583633955938",
+      "lastPropertyId": "18:2084606363050591021",
       "name": "PuzzleRunEntity",
       "properties": [
         {
@@ -128,13 +128,48 @@
           "id": "11:149959583633955938",
           "name": "randomMode",
           "type": 1
+        },
+        {
+          "id": "12:8906658838394950538",
+          "name": "bestCombo",
+          "type": 6
+        },
+        {
+          "id": "13:8202783020189591140",
+          "name": "highestRating",
+          "type": 6
+        },
+        {
+          "id": "14:30398039662417080",
+          "name": "durationMs",
+          "type": 6
+        },
+        {
+          "id": "15:8476112087905432923",
+          "name": "ratingBefore",
+          "type": 6
+        },
+        {
+          "id": "16:5149742275857844630",
+          "name": "ratingAfter",
+          "type": 6
+        },
+        {
+          "id": "17:7325951184150227489",
+          "name": "ratingChange",
+          "type": 6
+        },
+        {
+          "id": "18:2084606363050591021",
+          "name": "completed",
+          "type": 1
         }
       ],
       "relations": []
     },
     {
       "id": "3:1880154504866592291",
-      "lastPropertyId": "5:3968459840073216401",
+      "lastPropertyId": "15:1138298667090671640",
       "name": "PuzzleSettingsEntity",
       "properties": [
         {
@@ -162,6 +197,56 @@
           "id": "5:3968459840073216401",
           "name": "selectedMode",
           "type": 9
+        },
+        {
+          "id": "6:7035149040740008585",
+          "name": "ratedTasks",
+          "type": 1
+        },
+        {
+          "id": "7:2187781766553169871",
+          "name": "puzzleDifficulty",
+          "type": 9
+        },
+        {
+          "id": "8:7183120282935296196",
+          "name": "puzzleRating",
+          "type": 8
+        },
+        {
+          "id": "9:3793015079134057138",
+          "name": "puzzleDeviation",
+          "type": 8
+        },
+        {
+          "id": "10:9112345262262761495",
+          "name": "puzzleVolatility",
+          "type": 8
+        },
+        {
+          "id": "11:2126307407854585159",
+          "name": "puzzleRatingGames",
+          "type": 6
+        },
+        {
+          "id": "12:8989564297876645047",
+          "name": "puzzleRatingUpdatedAtMs",
+          "type": 6
+        },
+        {
+          "id": "13:6033127126273018828",
+          "name": "streakBest",
+          "type": 6
+        },
+        {
+          "id": "14:4853905729393446019",
+          "name": "stormBest",
+          "type": 6
+        },
+        {
+          "id": "15:1138298667090671640",
+          "name": "stormBestCombo",
+          "type": 6
         }
       ],
       "relations": []

@@ -95,7 +95,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(2, 623527614888720126),
     name: 'PuzzleRunEntity',
-    lastPropertyId: const obx_int.IdUid(11, 149959583633955938),
+    lastPropertyId: const obx_int.IdUid(18, 2084606363050591021),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -166,6 +166,48 @@ final _entities = <obx_int.ModelEntity>[
         type: 1,
         flags: 0,
       ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(12, 8906658838394950538),
+        name: 'bestCombo',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(13, 8202783020189591140),
+        name: 'highestRating',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(14, 30398039662417080),
+        name: 'durationMs',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(15, 8476112087905432923),
+        name: 'ratingBefore',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(16, 5149742275857844630),
+        name: 'ratingAfter',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(17, 7325951184150227489),
+        name: 'ratingChange',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(18, 2084606363050591021),
+        name: 'completed',
+        type: 1,
+        flags: 0,
+      ),
     ],
     relations: <obx_int.ModelRelation>[],
     backlinks: <obx_int.ModelBacklink>[],
@@ -173,7 +215,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(3, 1880154504866592291),
     name: 'PuzzleSettingsEntity',
-    lastPropertyId: const obx_int.IdUid(5, 3968459840073216401),
+    lastPropertyId: const obx_int.IdUid(15, 1138298667090671640),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -204,6 +246,66 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(5, 3968459840073216401),
         name: 'selectedMode',
         type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 7035149040740008585),
+        name: 'ratedTasks',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(7, 2187781766553169871),
+        name: 'puzzleDifficulty',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(8, 7183120282935296196),
+        name: 'puzzleRating',
+        type: 8,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(9, 3793015079134057138),
+        name: 'puzzleDeviation',
+        type: 8,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(10, 9112345262262761495),
+        name: 'puzzleVolatility',
+        type: 8,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(11, 2126307407854585159),
+        name: 'puzzleRatingGames',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(12, 8989564297876645047),
+        name: 'puzzleRatingUpdatedAtMs',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(13, 6033127126273018828),
+        name: 'streakBest',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(14, 4853905729393446019),
+        name: 'stormBest',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(15, 1138298667090671640),
+        name: 'stormBestCombo',
+        type: 6,
         flags: 0,
       ),
     ],
@@ -413,7 +515,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
       objectToFB: (PuzzleRunEntity object, fb.Builder fbb) {
         final catalogIdOffset = fbb.writeString(object.catalogId);
         final modeOffset = fbb.writeString(object.mode);
-        fbb.startTable(12);
+        fbb.startTable(19);
         fbb.addInt64(0, object.id);
         fbb.addOffset(1, catalogIdOffset);
         fbb.addOffset(2, modeOffset);
@@ -425,6 +527,13 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addInt64(8, object.minRating);
         fbb.addInt64(9, object.maxRating);
         fbb.addBool(10, object.randomMode);
+        fbb.addInt64(11, object.bestCombo);
+        fbb.addInt64(12, object.highestRating);
+        fbb.addInt64(13, object.durationMs);
+        fbb.addInt64(14, object.ratingBefore);
+        fbb.addInt64(15, object.ratingAfter);
+        fbb.addInt64(16, object.ratingChange);
+        fbb.addBool(17, object.completed);
         fbb.finish(fbb.endTable());
         return object.id;
       },
@@ -491,6 +600,48 @@ obx_int.ModelDefinition getObjectBoxModel() {
           24,
           false,
         );
+        final bestComboParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          26,
+          0,
+        );
+        final highestRatingParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          28,
+          0,
+        );
+        final durationMsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          30,
+          0,
+        );
+        final ratingBeforeParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          32,
+          0,
+        );
+        final ratingAfterParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          34,
+          0,
+        );
+        final ratingChangeParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          36,
+          0,
+        );
+        final completedParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          38,
+          false,
+        );
         final object = PuzzleRunEntity(
           id: idParam,
           catalogId: catalogIdParam,
@@ -503,6 +654,13 @@ obx_int.ModelDefinition getObjectBoxModel() {
           minRating: minRatingParam,
           maxRating: maxRatingParam,
           randomMode: randomModeParam,
+          bestCombo: bestComboParam,
+          highestRating: highestRatingParam,
+          durationMs: durationMsParam,
+          ratingBefore: ratingBeforeParam,
+          ratingAfter: ratingAfterParam,
+          ratingChange: ratingChangeParam,
+          completed: completedParam,
         );
 
         return object;
@@ -518,12 +676,23 @@ obx_int.ModelDefinition getObjectBoxModel() {
       },
       objectToFB: (PuzzleSettingsEntity object, fb.Builder fbb) {
         final selectedModeOffset = fbb.writeString(object.selectedMode);
-        fbb.startTable(6);
+        final puzzleDifficultyOffset = fbb.writeString(object.puzzleDifficulty);
+        fbb.startTable(16);
         fbb.addInt64(0, object.id);
         fbb.addInt64(1, object.minRating);
         fbb.addInt64(2, object.maxRating);
         fbb.addBool(3, object.randomMode);
         fbb.addOffset(4, selectedModeOffset);
+        fbb.addBool(5, object.ratedTasks);
+        fbb.addOffset(6, puzzleDifficultyOffset);
+        fbb.addFloat64(7, object.puzzleRating);
+        fbb.addFloat64(8, object.puzzleDeviation);
+        fbb.addFloat64(9, object.puzzleVolatility);
+        fbb.addInt64(10, object.puzzleRatingGames);
+        fbb.addInt64(11, object.puzzleRatingUpdatedAtMs);
+        fbb.addInt64(12, object.streakBest);
+        fbb.addInt64(13, object.stormBest);
+        fbb.addInt64(14, object.stormBestCombo);
         fbb.finish(fbb.endTable());
         return object.id;
       },
@@ -557,12 +726,79 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final selectedModeParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGet(buffer, rootOffset, 12, '');
+        final ratedTasksParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          14,
+          false,
+        );
+        final puzzleDifficultyParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 16, '');
+        final puzzleRatingParam = const fb.Float64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          18,
+          0,
+        );
+        final puzzleDeviationParam = const fb.Float64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          20,
+          0,
+        );
+        final puzzleVolatilityParam = const fb.Float64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          22,
+          0,
+        );
+        final puzzleRatingGamesParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          24,
+          0,
+        );
+        final puzzleRatingUpdatedAtMsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          26,
+          0,
+        );
+        final streakBestParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          28,
+          0,
+        );
+        final stormBestParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          30,
+          0,
+        );
+        final stormBestComboParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          32,
+          0,
+        );
         final object = PuzzleSettingsEntity(
           id: idParam,
           minRating: minRatingParam,
           maxRating: maxRatingParam,
           randomMode: randomModeParam,
           selectedMode: selectedModeParam,
+          ratedTasks: ratedTasksParam,
+          puzzleDifficulty: puzzleDifficultyParam,
+          puzzleRating: puzzleRatingParam,
+          puzzleDeviation: puzzleDeviationParam,
+          puzzleVolatility: puzzleVolatilityParam,
+          puzzleRatingGames: puzzleRatingGamesParam,
+          puzzleRatingUpdatedAtMs: puzzleRatingUpdatedAtMsParam,
+          streakBest: streakBestParam,
+          stormBest: stormBestParam,
+          stormBestCombo: stormBestComboParam,
         );
 
         return object;
@@ -736,6 +972,41 @@ class PuzzleRunEntity_ {
   static final randomMode = obx.QueryBooleanProperty<PuzzleRunEntity>(
     _entities[1].properties[10],
   );
+
+  /// See [PuzzleRunEntity.bestCombo].
+  static final bestCombo = obx.QueryIntegerProperty<PuzzleRunEntity>(
+    _entities[1].properties[11],
+  );
+
+  /// See [PuzzleRunEntity.highestRating].
+  static final highestRating = obx.QueryIntegerProperty<PuzzleRunEntity>(
+    _entities[1].properties[12],
+  );
+
+  /// See [PuzzleRunEntity.durationMs].
+  static final durationMs = obx.QueryIntegerProperty<PuzzleRunEntity>(
+    _entities[1].properties[13],
+  );
+
+  /// See [PuzzleRunEntity.ratingBefore].
+  static final ratingBefore = obx.QueryIntegerProperty<PuzzleRunEntity>(
+    _entities[1].properties[14],
+  );
+
+  /// See [PuzzleRunEntity.ratingAfter].
+  static final ratingAfter = obx.QueryIntegerProperty<PuzzleRunEntity>(
+    _entities[1].properties[15],
+  );
+
+  /// See [PuzzleRunEntity.ratingChange].
+  static final ratingChange = obx.QueryIntegerProperty<PuzzleRunEntity>(
+    _entities[1].properties[16],
+  );
+
+  /// See [PuzzleRunEntity.completed].
+  static final completed = obx.QueryBooleanProperty<PuzzleRunEntity>(
+    _entities[1].properties[17],
+  );
 }
 
 /// [PuzzleSettingsEntity] entity fields to define ObjectBox queries.
@@ -763,6 +1034,58 @@ class PuzzleSettingsEntity_ {
   /// See [PuzzleSettingsEntity.selectedMode].
   static final selectedMode = obx.QueryStringProperty<PuzzleSettingsEntity>(
     _entities[2].properties[4],
+  );
+
+  /// See [PuzzleSettingsEntity.ratedTasks].
+  static final ratedTasks = obx.QueryBooleanProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[5],
+  );
+
+  /// See [PuzzleSettingsEntity.puzzleDifficulty].
+  static final puzzleDifficulty = obx.QueryStringProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[6],
+  );
+
+  /// See [PuzzleSettingsEntity.puzzleRating].
+  static final puzzleRating = obx.QueryDoubleProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[7],
+  );
+
+  /// See [PuzzleSettingsEntity.puzzleDeviation].
+  static final puzzleDeviation = obx.QueryDoubleProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[8],
+  );
+
+  /// See [PuzzleSettingsEntity.puzzleVolatility].
+  static final puzzleVolatility = obx.QueryDoubleProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[9],
+  );
+
+  /// See [PuzzleSettingsEntity.puzzleRatingGames].
+  static final puzzleRatingGames =
+      obx.QueryIntegerProperty<PuzzleSettingsEntity>(
+        _entities[2].properties[10],
+      );
+
+  /// See [PuzzleSettingsEntity.puzzleRatingUpdatedAtMs].
+  static final puzzleRatingUpdatedAtMs =
+      obx.QueryIntegerProperty<PuzzleSettingsEntity>(
+        _entities[2].properties[11],
+      );
+
+  /// See [PuzzleSettingsEntity.streakBest].
+  static final streakBest = obx.QueryIntegerProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[12],
+  );
+
+  /// See [PuzzleSettingsEntity.stormBest].
+  static final stormBest = obx.QueryIntegerProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[13],
+  );
+
+  /// See [PuzzleSettingsEntity.stormBestCombo].
+  static final stormBestCombo = obx.QueryIntegerProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[14],
   );
 }
 

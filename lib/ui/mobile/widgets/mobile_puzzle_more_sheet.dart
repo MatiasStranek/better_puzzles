@@ -50,7 +50,9 @@ class MobilePuzzleMoreSheet extends StatelessWidget {
               const SizedBox(height: 16),
               _SheetButton(
                 icon: Icons.refresh,
-                label: 'Run zurücksetzen',
+                label: controller.runEnded
+                    ? '${controller.mode.shortLabel} neu starten'
+                    : 'Run zurücksetzen',
                 onTap: () {
                   controller.resetRun();
                   Navigator.of(context).pop();
@@ -69,14 +71,15 @@ class MobilePuzzleMoreSheet extends StatelessWidget {
                   }
                 },
               ),
-              _SheetButton(
-                icon: Icons.skip_next_rounded,
-                label: 'Nächstes Puzzle',
-                onTap: () {
-                  controller.loadNextPuzzle();
-                  Navigator.of(context).pop();
-                },
-              ),
+              if (controller.canSkipPuzzle)
+                _SheetButton(
+                  icon: Icons.skip_next_rounded,
+                  label: 'Puzzle überspringen',
+                  onTap: () {
+                    controller.skipCurrentPuzzle();
+                    Navigator.of(context).pop();
+                  },
+                ),
             ],
           ),
         ),

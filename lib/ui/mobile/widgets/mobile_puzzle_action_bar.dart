@@ -32,6 +32,8 @@ class MobilePuzzleActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canSkip = controller.canSkipPuzzle && !controller.loadingPuzzle;
+
     return Container(
       height: height,
       decoration: BoxDecoration(
@@ -67,10 +69,12 @@ class MobilePuzzleActionBar extends StatelessWidget {
           ),
           Expanded(
             child: _ActionBarButton(
-              icon: Icons.keyboard_double_arrow_right,
-              tooltip: 'Nächstes Puzzle',
-              isEnabled: true,
-              onPressed: controller.loadNextPuzzle,
+              icon: Icons.skip_next_rounded,
+              tooltip: canSkip
+                  ? 'Puzzle überspringen'
+                  : 'In diesem Modus nicht verfügbar',
+              isEnabled: canSkip,
+              onPressed: controller.skipCurrentPuzzle,
             ),
           ),
           Expanded(
@@ -111,9 +115,7 @@ class _ActionBarButton extends StatelessWidget {
       child: InkResponse(
         onTap: isEnabled ? onPressed : null,
         radius: 28,
-        child: Center(
-          child: Icon(icon, size: 32, color: color),
-        ),
+        child: Center(child: Icon(icon, size: 32, color: color)),
       ),
     );
   }

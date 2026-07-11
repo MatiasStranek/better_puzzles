@@ -29,9 +29,7 @@ class UserStoreManager {
     }
 
     await objectBoxDirectory.create(recursive: true);
-    _store = user_obx.openStore(
-      directory: objectBoxDirectory.path,
-    );
+    _store = user_obx.openStore(directory: objectBoxDirectory.path);
 
     final metaBox = store.box<UserStoreMetaEntity>();
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
@@ -39,19 +37,18 @@ class UserStoreManager {
 
     if (existing == null) {
       metaBox.put(
-        UserStoreMetaEntity(
-          createdAtUtcMs: now,
-          lastOpenedAtUtcMs: now,
-        ),
+        UserStoreMetaEntity(createdAtUtcMs: now, lastOpenedAtUtcMs: now),
       );
     } else {
-      existing.lastOpenedAtUtcMs = now;
+      existing
+        ..schemaVersion = 2
+        ..lastOpenedAtUtcMs = now;
       metaBox.put(existing);
     }
 
-    final settings = store
-        .box<PuzzleSettingsEntity>()
-        .get(PuzzleSettingsEntity.singletonId);
+    final settings = store.box<PuzzleSettingsEntity>().get(
+      PuzzleSettingsEntity.singletonId,
+    );
     if (settings == null) {
       store.box<PuzzleSettingsEntity>().put(PuzzleSettingsEntity());
     }

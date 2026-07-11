@@ -1,16 +1,10 @@
 class PuzzleRange {
-  const PuzzleRange({
-    required this.minRating,
-    required this.maxRating,
-  });
+  const PuzzleRange({required this.minRating, required this.maxRating});
 
   final int minRating;
   final int maxRating;
 
-  PuzzleRange copyWith({
-    int? minRating,
-    int? maxRating,
-  }) {
+  PuzzleRange copyWith({int? minRating, int? maxRating}) {
     final nextMin = minRating ?? this.minRating;
     final nextMax = maxRating ?? this.maxRating;
 
@@ -22,4 +16,14 @@ class PuzzleRange {
   }
 
   String get label => '$minRating–$maxRating';
+
+  @override
+  bool operator ==(Object other) {
+    return other is PuzzleRange &&
+        other.minRating == minRating &&
+        other.maxRating == maxRating;
+  }
+
+  @override
+  int get hashCode => Object.hash(minRating, maxRating);
 }

@@ -14,6 +14,13 @@ class PuzzleRunEntity {
     required this.minRating,
     required this.maxRating,
     required this.randomMode,
+    this.bestCombo = 0,
+    this.highestRating = 0,
+    this.durationMs = 0,
+    this.ratingBefore = 0,
+    this.ratingAfter = 0,
+    this.ratingChange = 0,
+    this.completed = false,
   });
 
   @Id()
@@ -34,4 +41,11 @@ class PuzzleRunEntity {
   int minRating;
   int maxRating;
   bool randomMode;
+  int bestCombo;
+  int highestRating;
+  int durationMs;
+  int ratingBefore;
+  int ratingAfter;
+  int ratingChange;
+  bool completed;
 }

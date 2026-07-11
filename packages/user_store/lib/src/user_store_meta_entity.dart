@@ -4,7 +4,7 @@ import 'package:objectbox/objectbox.dart';
 class UserStoreMetaEntity {
   UserStoreMetaEntity({
     this.id = singletonId,
-    this.schemaVersion = 1,
+    this.schemaVersion = 2,
     required this.createdAtUtcMs,
     required this.lastOpenedAtUtcMs,
   });

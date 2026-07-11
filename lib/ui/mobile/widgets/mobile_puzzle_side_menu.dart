@@ -20,19 +20,13 @@ class MobilePuzzleSideMenu extends StatelessWidget {
   final bool isEnabled;
 
   void _setMode(PuzzleMode mode) {
-    if (!isEnabled) {
-      return;
-    }
-
+    if (!isEnabled) return;
     controller.setMode(mode);
     onClose();
   }
 
   Future<void> _showRangeDialog(BuildContext context) async {
-    if (!isEnabled) {
-      return;
-    }
-
+    if (!isEnabled) return;
     var min = controller.range.minRating;
     var max = controller.range.maxRating;
 
@@ -42,105 +36,184 @@ class MobilePuzzleSideMenu extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withAlpha(160),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF151515),
-                  borderRadius: BorderRadius.circular(26),
-                  border: Border.all(color: Colors.white.withAlpha(28)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(150),
-                      blurRadius: 24,
-                      offset: const Offset(0, 12),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFF151515),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: Colors.white.withAlpha(28)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(150),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(55),
+                      borderRadius: BorderRadius.circular(99),
                     ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(55),
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Rating Range',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      _RangeValue(label: 'Min', value: min),
-                      Slider(
-                        value: min.toDouble(),
-                        min: 400,
-                        max: 3000,
-                        divisions: 26,
-                        label: '$min',
-                        onChanged: (value) {
-                          setModalState(() {
-                            min = value.round();
-                            if (min > max) {
-                              max = min;
-                            }
-                          });
-                        },
-                      ),
-                      _RangeValue(label: 'Max', value: max),
-                      Slider(
-                        value: max.toDouble(),
-                        min: 400,
-                        max: 3000,
-                        divisions: 26,
-                        label: '$max',
-                        onChanged: (value) {
-                          setModalState(() {
-                            max = value.round();
-                            if (max < min) {
-                              min = max;
-                            }
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 14),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: FilledButton(
-                          onPressed: () {
-                            controller.setRange(
-                              PuzzleRange(minRating: min, maxRating: max),
-                            );
-                            Navigator.of(context).pop();
-                          },
-                          child: const Text(
-                            'Übernehmen',
-                            style: TextStyle(fontWeight: FontWeight.w900),
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Rating Range',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _RangeValue(label: 'Min', value: min),
+                  Slider(
+                    value: min.toDouble(),
+                    min: 400,
+                    max: 3000,
+                    divisions: 26,
+                    label: '$min',
+                    onChanged: (value) => setModalState(() {
+                      min = value.round();
+                      if (min > max) max = min;
+                    }),
+                  ),
+                  _RangeValue(label: 'Max', value: max),
+                  Slider(
+                    value: max.toDouble(),
+                    min: 400,
+                    max: 3000,
+                    divisions: 26,
+                    label: '$max',
+                    onChanged: (value) => setModalState(() {
+                      max = value.round();
+                      if (max < min) min = max;
+                    }),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      onPressed: () {
+                        controller.setRange(
+                          PuzzleRange(minRating: min, maxRating: max),
+                        );
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text(
+                        'Übernehmen',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            );
-          },
-        );
-      },
+            ),
+          ),
+        ),
+      ),
     );
+  }
+
+  List<Widget> _modeControls(BuildContext context) {
+    switch (controller.mode) {
+      case PuzzleMode.tasks:
+        return [
+          _SideMenuButton(
+            icon: controller.ratedTasks
+                ? Icons.verified_rounded
+                : Icons.tune_rounded,
+            label: 'Aufgabenwertung',
+            value: controller.ratedTasks
+                ? 'Gewertet · ${controller.localRatingLabel}'
+                : 'Freies Training',
+            onTap: () => controller.setRatedTasks(!controller.ratedTasks),
+            isEnabled: isEnabled,
+            isHighlighted: controller.ratedTasks,
+          ),
+          if (controller.ratedTasks)
+            _SideMenuButton(
+              icon: Icons.trending_up_rounded,
+              label: 'Schwierigkeit',
+              value: controller.difficulty.detailLabel,
+              onTap: controller.cycleDifficulty,
+              isEnabled: isEnabled,
+            )
+          else ...[
+            _SideMenuButton(
+              icon: Icons.speed,
+              label: 'Range',
+              value: controller.range.label,
+              onTap: () => _showRangeDialog(context),
+              isEnabled: isEnabled,
+            ),
+            _SideMenuButton(
+              icon: Icons.shuffle,
+              label: 'Random',
+              value: controller.randomMode
+                  ? 'Zufällig pro Puzzle'
+                  : 'Aufsteigend',
+              onTap: () => controller.setRandomMode(!controller.randomMode),
+              isEnabled: isEnabled,
+            ),
+          ],
+        ];
+      case PuzzleMode.streak:
+        return [
+          _SideMenuButton(
+            icon: Icons.local_fire_department_rounded,
+            label: 'Streak',
+            value: '${controller.streak} · Best ${controller.streakBest}',
+            onTap: null,
+            isEnabled: isEnabled,
+            isHighlighted: true,
+          ),
+          _SideMenuButton(
+            icon: Icons.info_outline_rounded,
+            label: 'Regel',
+            value: 'Ein Fehler beendet den Lauf',
+            onTap: null,
+            isEnabled: isEnabled,
+          ),
+        ];
+      case PuzzleMode.storm:
+        return [
+          _SideMenuButton(
+            icon: Icons.timer_rounded,
+            label: 'Zeit',
+            value: controller.stormTimeText,
+            onTap: null,
+            isEnabled: isEnabled,
+            isHighlighted: true,
+          ),
+          _SideMenuButton(
+            icon: Icons.bolt_rounded,
+            label: 'Storm',
+            value:
+                '${controller.score} gelöst · Combo ${controller.combo} · ${controller.mistakes} Fehler',
+            onTap: null,
+            isEnabled: isEnabled,
+          ),
+          _SideMenuButton(
+            icon: Icons.emoji_events_rounded,
+            label: 'Bestwerte',
+            value:
+                'Score ${controller.stormBest} · Combo ${controller.stormBestCombo}',
+            onTap: null,
+            isEnabled: isEnabled,
+          ),
+        ];
+    }
   }
 
   @override
@@ -182,32 +255,20 @@ class MobilePuzzleSideMenu extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     Expanded(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            ..._modeControls(context),
                             _SideMenuButton(
-                              icon: Icons.speed,
-                              label: 'Range',
-                              value: controller.range.label,
-                              onTap: () => _showRangeDialog(context),
-                              isEnabled: isEnabled,
-                              isHighlighted: true,
-                            ),
-                            _SideMenuButton(
-                              icon: Icons.shuffle,
-                              label: 'Random',
-                              value: controller.randomMode
-                                  ? 'Zufällig pro Puzzle'
-                                  : 'Aufsteigend',
-                              onTap: () {
-                                controller.setRandomMode(
-                                  !controller.randomMode,
-                                );
-                              },
+                              icon: Icons.analytics_rounded,
+                              label: controller.primaryMetricLabel,
+                              value:
+                                  '${controller.primaryMetricValue} · ${controller.secondaryMetricLabel} ${controller.secondaryMetricValue} · ${controller.tertiaryMetricLabel} ${controller.tertiaryMetricValue}',
+                              onTap: null,
                               isEnabled: isEnabled,
                             ),
                             _SideMenuButton(
@@ -229,7 +290,7 @@ class MobilePuzzleSideMenu extends StatelessWidget {
                                 icon: Icons.extension_rounded,
                                 label: 'Aktuelles Puzzle',
                                 value:
-                                    '${puzzle.lichessPuzzleId} · ${puzzle.rating}',
+                                    '${puzzle.lichessPuzzleId} · ${puzzle.rating} · ${controller.lastQueryDurationMs}ms',
                                 onTap: null,
                                 isEnabled: isEnabled,
                               ),
@@ -241,14 +302,15 @@ class MobilePuzzleSideMenu extends StatelessWidget {
                                 isEnabled: isEnabled,
                               ),
                             ],
-                            _SideMenuButton(
-                              icon: Icons.leaderboard_rounded,
-                              label: 'Score',
-                              value:
-                                  '${controller.score} · Streak ${controller.streak} · Fehler ${controller.mistakes}',
-                              onTap: null,
-                              isEnabled: isEnabled,
-                            ),
+                            if (controller.runEnded)
+                              _SideMenuButton(
+                                icon: Icons.restart_alt_rounded,
+                                label: 'Neuer Lauf',
+                                value: controller.feedbackText,
+                                onTap: controller.resetRun,
+                                isEnabled: isEnabled,
+                                isHighlighted: true,
+                              ),
                           ],
                         ),
                       ),
@@ -258,7 +320,7 @@ class MobilePuzzleSideMenu extends StatelessWidget {
                     _SideMenuButton(
                       icon: Icons.task_alt_rounded,
                       label: 'Aufgaben',
-                      value: 'Normaler Puzzle-Modus',
+                      value: 'Training mit optionaler Wertung',
                       onTap: () => _setMode(PuzzleMode.tasks),
                       isEnabled: isEnabled,
                       isHighlighted: controller.mode == PuzzleMode.tasks,
@@ -266,7 +328,7 @@ class MobilePuzzleSideMenu extends StatelessWidget {
                     _SideMenuButton(
                       icon: Icons.local_fire_department_rounded,
                       label: 'Puzzle Streak',
-                      value: 'Serie ohne Zeitdruck',
+                      value: 'Ein Fehler beendet die Serie',
                       onTap: () => _setMode(PuzzleMode.streak),
                       isEnabled: isEnabled,
                       isHighlighted: controller.mode == PuzzleMode.streak,
@@ -274,7 +336,7 @@ class MobilePuzzleSideMenu extends StatelessWidget {
                     _SideMenuButton(
                       icon: Icons.flash_on_rounded,
                       label: 'Puzzle Storm',
-                      value: 'Zeitmodus',
+                      value: '3 Minuten · Combo-Zeitboni',
                       onTap: () => _setMode(PuzzleMode.storm),
                       isEnabled: isEnabled,
                       isHighlighted: controller.mode == PuzzleMode.storm,
@@ -292,32 +354,29 @@ class MobilePuzzleSideMenu extends StatelessWidget {
 
 class _RangeValue extends StatelessWidget {
   const _RangeValue({required this.label, required this.value});
-
   final String label;
   final int value;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withAlpha(150),
-            fontWeight: FontWeight.w800,
-          ),
+  Widget build(BuildContext context) => Row(
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          color: Colors.white.withAlpha(150),
+          fontWeight: FontWeight.w800,
         ),
-        const Spacer(),
-        Text(
-          '$value',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-          ),
+      ),
+      const Spacer(),
+      Text(
+        '$value',
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
 }
 
 class _SideMenuButton extends StatelessWidget {
@@ -336,7 +395,6 @@ class _SideMenuButton extends StatelessWidget {
   final bool isEnabled;
   final bool isHighlighted;
   final VoidCallback? onTap;
-
   static const Color _accentColor = Color(0xFF5C9DFF);
 
   @override
@@ -346,7 +404,6 @@ class _SideMenuButton extends StatelessWidget {
               ? _accentColor
               : Colors.white
         : Colors.white.withAlpha(76);
-
     final valueColor = isEnabled
         ? Colors.white.withAlpha(170)
         : Colors.white.withAlpha(76);
@@ -355,10 +412,10 @@ class _SideMenuButton extends StatelessWidget {
       onTap: isEnabled ? onTap : null,
       borderRadius: BorderRadius.circular(14),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 11),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: [
-            SizedBox(width: 46, child: Icon(icon, size: 30, color: color)),
+            SizedBox(width: 46, child: Icon(icon, size: 28, color: color)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -370,7 +427,7 @@ class _SideMenuButton extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: color,
-                      fontSize: 18,
+                      fontSize: 17,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
