@@ -36,6 +36,22 @@ class PuzzleUserRepository {
         minRating: entity.minRating,
         maxRating: entity.maxRating,
       ),
+      tasksRange: PuzzleRange(
+        minRating: entity.tasksMinRating,
+        maxRating: entity.tasksMaxRating,
+      ),
+      streakRange: PuzzleRange(
+        minRating: entity.streakMinRating,
+        maxRating: entity.streakMaxRating,
+      ),
+      stormRange: PuzzleRange(
+        minRating: entity.stormMinRating,
+        maxRating: entity.stormMaxRating,
+      ),
+      tasksCustomRange: entity.tasksCustomRange,
+      streakCustomRange: entity.streakCustomRange,
+      stormCustomRange: entity.stormCustomRange,
+      ignoreSolvedPuzzles: entity.ignoreSolvedPuzzles,
       randomMode: entity.randomMode,
       mode: PuzzleMode.fromStorageName(entity.selectedMode),
       ratedTasks: hasRatingState ? entity.ratedTasks : true,
@@ -54,6 +70,16 @@ class PuzzleUserRepository {
       PuzzleSettingsEntity(
         minRating: settings.range.minRating,
         maxRating: settings.range.maxRating,
+        tasksMinRating: settings.tasksRange.minRating,
+        tasksMaxRating: settings.tasksRange.maxRating,
+        streakMinRating: settings.streakRange.minRating,
+        streakMaxRating: settings.streakRange.maxRating,
+        stormMinRating: settings.stormRange.minRating,
+        stormMaxRating: settings.stormRange.maxRating,
+        tasksCustomRange: settings.tasksCustomRange,
+        streakCustomRange: settings.streakCustomRange,
+        stormCustomRange: settings.stormCustomRange,
+        ignoreSolvedPuzzles: settings.ignoreSolvedPuzzles,
         randomMode: settings.randomMode,
         selectedMode: settings.mode.storageName,
         ratedTasks: settings.ratedTasks,
@@ -70,7 +96,47 @@ class PuzzleUserRepository {
     );
   }
 
-  void recordPuzzleResult({
+  int countSolvedPuzzles() {
+    final query = _storeManager.progressBox
+        .query(user_obx.PuzzleProgressEntity_.solvedCount.greaterThan(0))
+        .build();
+    try {
+      return query.count();
+    } finally {
+      query.close();
+    }
+  }
+
+  Set<String> loadSolvedPuzzleIds() {
+    final query = _storeManager.progressBox
+        .query(user_obx.PuzzleProgressEntity_.solvedCount.greaterThan(0))
+        .build();
+    try {
+      return query
+          .property(user_obx.PuzzleProgressEntity_.lichessPuzzleId)
+          .find()
+          .toSet();
+    } finally {
+      query.close();
+    }
+  }
+
+  PuzzleProgressEntity? loadPuzzleProgress(String lichessPuzzleId) {
+    final query = _storeManager.progressBox
+        .query(
+          user_obx.PuzzleProgressEntity_.lichessPuzzleId.equals(
+            lichessPuzzleId,
+          ),
+        )
+        .build();
+    try {
+      return query.findFirst();
+    } finally {
+      query.close();
+    }
+  }
+
+  PuzzleResultUpdate recordPuzzleResult({
     required String lichessPuzzleId,
     required bool solved,
     required int elapsedMs,
@@ -92,6 +158,7 @@ class PuzzleUserRepository {
 
     final now = DateTime.now().toUtc().millisecondsSinceEpoch;
     progress ??= PuzzleProgressEntity(lichessPuzzleId: lichessPuzzleId);
+    final wasSolved = progress.solvedCount > 0;
     progress.attempts++;
     progress.lastPlayedAtMs = now;
 
@@ -111,6 +178,11 @@ class PuzzleUserRepository {
     }
 
     _storeManager.progressBox.put(progress);
+    return PuzzleResultUpdate(
+      solvedCount: progress.solvedCount,
+      failedCount: progress.failedCount,
+      newlySolved: solved && !wasSolved,
+    );
   }
 
   int startRun({
@@ -170,6 +242,13 @@ class PuzzleSettingsSnapshot {
   const PuzzleSettingsSnapshot({
     required this.range,
     required this.randomMode,
+    required this.tasksRange,
+    required this.streakRange,
+    required this.stormRange,
+    required this.tasksCustomRange,
+    required this.streakCustomRange,
+    required this.stormCustomRange,
+    required this.ignoreSolvedPuzzles,
     required this.mode,
     required this.ratedTasks,
     required this.difficulty,
@@ -181,6 +260,13 @@ class PuzzleSettingsSnapshot {
 
   final PuzzleRange range;
   final bool randomMode;
+  final PuzzleRange tasksRange;
+  final PuzzleRange streakRange;
+  final PuzzleRange stormRange;
+  final bool tasksCustomRange;
+  final bool streakCustomRange;
+  final bool stormCustomRange;
+  final bool ignoreSolvedPuzzles;
   final PuzzleMode mode;
   final bool ratedTasks;
   final PuzzleDifficulty difficulty;
@@ -188,4 +274,16 @@ class PuzzleSettingsSnapshot {
   final int streakBest;
   final int stormBest;
   final int stormBestCombo;
+}
+
+class PuzzleResultUpdate {
+  const PuzzleResultUpdate({
+    required this.solvedCount,
+    required this.failedCount,
+    required this.newlySolved,
+  });
+
+  final int solvedCount;
+  final int failedCount;
+  final bool newlySolved;
 }

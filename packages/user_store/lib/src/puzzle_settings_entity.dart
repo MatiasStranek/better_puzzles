@@ -6,6 +6,16 @@ class PuzzleSettingsEntity {
     this.id = singletonId,
     this.minRating = 600,
     this.maxRating = 1600,
+    this.tasksMinRating = 600,
+    this.tasksMaxRating = 1600,
+    this.streakMinRating = 400,
+    this.streakMaxRating = 2799,
+    this.stormMinRating = 400,
+    this.stormMaxRating = 2499,
+    this.tasksCustomRange = false,
+    this.streakCustomRange = false,
+    this.stormCustomRange = false,
+    this.ignoreSolvedPuzzles = false,
     this.randomMode = false,
     this.selectedMode = 'tasks',
     this.ratedTasks = true,
@@ -27,6 +37,16 @@ class PuzzleSettingsEntity {
 
   int minRating;
   int maxRating;
+  int tasksMinRating;
+  int tasksMaxRating;
+  int streakMinRating;
+  int streakMaxRating;
+  int stormMinRating;
+  int stormMaxRating;
+  bool tasksCustomRange;
+  bool streakCustomRange;
+  bool stormCustomRange;
+  bool ignoreSolvedPuzzles;
   bool randomMode;
   String selectedMode;
 

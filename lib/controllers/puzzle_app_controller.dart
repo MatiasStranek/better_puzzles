@@ -42,11 +42,24 @@ class PuzzleAppController extends ChangeNotifier {
 
   PuzzleMode _mode = PuzzleMode.tasks;
   PuzzleRange _range = const PuzzleRange(minRating: 600, maxRating: 1600);
+  PuzzleRange _tasksRange = const PuzzleRange(minRating: 600, maxRating: 1600);
+  PuzzleRange _streakRange = const PuzzleRange(minRating: 400, maxRating: 2799);
+  PuzzleRange _stormRange = const PuzzleRange(minRating: 400, maxRating: 2499);
+  bool _tasksCustomRange = false;
+  bool _streakCustomRange = false;
+  bool _stormCustomRange = false;
   bool _randomMode = false;
   bool _ratedTasks = true;
   PuzzleDifficulty _difficulty = PuzzleDifficulty.normal;
   Glicko2Rating _puzzleRating = Glicko2Rating.initial;
   int _lastRatingChange = 0;
+  int _currentSolvedCount = 0;
+  int _currentFailedCount = 0;
+  bool _ignoreSolvedPuzzles = false;
+  int _solvedPuzzleCount = 0;
+  bool _solvedPuzzleIdsLoaded = false;
+  final Set<String> _solvedPuzzleIds = <String>{};
+  final Set<String> _selectionExcludedPuzzleIds = <String>{};
 
   PuzzleDatabaseStatus _databaseStatus = const PuzzleDatabaseStatus.missing();
   PuzzleRecord? _currentPuzzle;
@@ -112,9 +125,20 @@ class PuzzleAppController extends ChangeNotifier {
   String? _databaseInitializationError;
 
   PuzzleMode get mode => _mode;
-  PuzzleRange get range => _range;
+  PuzzleRange get range => switch (_mode) {
+    PuzzleMode.tasks => _tasksRange,
+    PuzzleMode.streak => _streakRange,
+    PuzzleMode.storm => _stormRange,
+  };
+  bool get customRangeEnabled => switch (_mode) {
+    PuzzleMode.tasks => _tasksCustomRange,
+    PuzzleMode.streak => _streakCustomRange,
+    PuzzleMode.storm => _stormCustomRange,
+  };
   bool get randomMode => _randomMode;
   bool get ratedTasks => _ratedTasks;
+  bool get ignoreSolvedPuzzles => _ignoreSolvedPuzzles;
+  int get solvedPuzzleCount => _solvedPuzzleCount;
   PuzzleDifficulty get difficulty => _difficulty;
   Glicko2Rating get puzzleRating => _puzzleRating;
   int get lastRatingChange => _lastRatingChange;
@@ -151,6 +175,15 @@ class PuzzleAppController extends ChangeNotifier {
 
   bool get taskControlsUseRange => _mode == PuzzleMode.tasks && !_ratedTasks;
   bool get canSkipPuzzle => _mode == PuzzleMode.tasks && !_runEnded;
+
+  String get solvedPuzzleProgressLabel {
+    final total = _databaseStatus.puzzleCount;
+    final solved = _formatCount(_solvedPuzzleCount);
+    if (total == null || total <= 0) {
+      return '$solved eindeutig gelöst';
+    }
+    return '$solved von ${_formatCount(total)} gelöst';
+  }
 
   String get localRatingLabel {
     final provisional = _puzzleRating.provisional ? '?' : '';
@@ -284,26 +317,12 @@ class PuzzleAppController extends ChangeNotifier {
 
   String get statusText {
     final puzzle = _currentPuzzle;
-
-    if (_runEnded) {
-      return switch (_mode) {
-        PuzzleMode.tasks => 'Aufgaben · $localRatingLabel',
-        PuzzleMode.streak => 'Streak beendet · $_score gelöst',
-        PuzzleMode.storm => 'Storm beendet · $_score gelöst',
-      };
-    }
-
     if (puzzle == null) {
       return _loadingPuzzle ? 'Puzzle wird geladen …' : 'Keine Aufgabe geladen';
     }
 
-    return switch (_mode) {
-      PuzzleMode.tasks =>
-        'Aufgaben · $localRatingLabel · Puzzle ${puzzle.rating}',
-      PuzzleMode.streak =>
-        'Streak $_streak · Best $_streakBest · ${puzzle.rating}',
-      PuzzleMode.storm => '$stormTimeText · Gelöst $_score · Combo $_combo',
-    };
+    return 'ELO ${puzzle.rating} · Erfolgreich $_currentSolvedCount · '
+        'Gescheitert $_currentFailedCount';
   }
 
   String get moveStripText {
@@ -336,6 +355,13 @@ class PuzzleAppController extends ChangeNotifier {
 
     final settings = _userRepository!.loadSettings();
     _range = settings.range;
+    _tasksRange = settings.tasksRange;
+    _streakRange = settings.streakRange;
+    _stormRange = settings.stormRange;
+    _tasksCustomRange = settings.tasksCustomRange;
+    _streakCustomRange = settings.streakCustomRange;
+    _stormCustomRange = settings.stormCustomRange;
+    _ignoreSolvedPuzzles = settings.ignoreSolvedPuzzles;
     _randomMode = settings.randomMode;
     _mode = settings.mode;
     _ratedTasks = settings.ratedTasks;
@@ -344,6 +370,15 @@ class PuzzleAppController extends ChangeNotifier {
     _streakBest = settings.streakBest;
     _stormBest = settings.stormBest;
     _stormBestCombo = settings.stormBestCombo;
+    if (_ignoreSolvedPuzzles) {
+      _solvedPuzzleIds
+        ..clear()
+        ..addAll(_userRepository!.loadSolvedPuzzleIds());
+      _solvedPuzzleIdsLoaded = true;
+      _solvedPuzzleCount = _solvedPuzzleIds.length;
+    } else {
+      _solvedPuzzleCount = _userRepository!.countSolvedPuzzles();
+    }
 
     final manifest = stores.activeManifest;
     if (manifest == null || !stores.catalogStore.isOpen) {
@@ -446,15 +481,75 @@ class PuzzleAppController extends ChangeNotifier {
       _stormPlayerColor = DateTime.now().millisecondsSinceEpoch.isEven ? 0 : 1;
     }
     _mode = mode;
+    _range = range;
     _saveSettings();
     await _beginMode(resetCounters: true);
   }
 
   void setRange(PuzzleRange range) {
     _range = range;
+    switch (_mode) {
+      case PuzzleMode.tasks:
+        _tasksRange = range;
+        _tasksCustomRange = true;
+        break;
+      case PuzzleMode.streak:
+        _streakRange = range;
+        _streakCustomRange = true;
+        break;
+      case PuzzleMode.storm:
+        _stormRange = range;
+        _stormCustomRange = true;
+        break;
+    }
     _repository.resetCursors();
     _saveSettings();
     unawaited(_beginMode(resetCounters: true));
+  }
+
+  void resetRangeForCurrentMode() {
+    switch (_mode) {
+      case PuzzleMode.tasks:
+        _tasksRange = const PuzzleRange(minRating: 600, maxRating: 1600);
+        _tasksCustomRange = false;
+        break;
+      case PuzzleMode.streak:
+        _streakRange = const PuzzleRange(minRating: 400, maxRating: 2799);
+        _streakCustomRange = false;
+        break;
+      case PuzzleMode.storm:
+        _stormRange = const PuzzleRange(minRating: 400, maxRating: 2499);
+        _stormCustomRange = false;
+        break;
+    }
+    _range = range;
+    _repository.resetCursors();
+    _saveSettings();
+    unawaited(_beginMode(resetCounters: true));
+  }
+
+  void setIgnoreSolvedPuzzles(bool enabled) {
+    if (_ignoreSolvedPuzzles == enabled) {
+      return;
+    }
+    unawaited(_setIgnoreSolvedPuzzles(enabled));
+  }
+
+  Future<void> _setIgnoreSolvedPuzzles(bool enabled) async {
+    if (enabled && !_solvedPuzzleIdsLoaded) {
+      final repository = _userRepository;
+      if (repository != null) {
+        _solvedPuzzleIds
+          ..clear()
+          ..addAll(repository.loadSolvedPuzzleIds());
+        _solvedPuzzleCount = _solvedPuzzleIds.length;
+      }
+      _solvedPuzzleIdsLoaded = true;
+    }
+
+    _ignoreSolvedPuzzles = enabled;
+    _saveSettings();
+    await _beginMode(resetCounters: true);
   }
 
   void setRandomMode(bool enabled) {
@@ -544,6 +639,12 @@ class PuzzleAppController extends ChangeNotifier {
       return;
     }
 
+    if (canHumanMovePiece(square)) {
+      _selectedSquare = square;
+      notifyListeners();
+      return;
+    }
+
     await movePiece(from: selected, to: square);
   }
 
@@ -562,7 +663,17 @@ class PuzzleAppController extends ChangeNotifier {
   }
 
   bool canMoveTo({required String from, required String to}) {
-    return !_loadingPuzzle && !_runEnded && from != to;
+    if (_loadingPuzzle || _runEnded || from == to) return false;
+    final position = _position;
+    if (position == null) return false;
+    final base = '$from$to'.toLowerCase();
+    final piece = position.pieceAt(from);
+    if (piece != null &&
+        piece.toLowerCase() == 'p' &&
+        (to.endsWith('1') || to.endsWith('8'))) {
+      return position.isLegalUci('${base}q');
+    }
+    return position.isLegalUci(base);
   }
 
   Future<bool> movePiece({
@@ -587,10 +698,25 @@ class PuzzleAppController extends ChangeNotifier {
       return false;
     }
 
+    var candidate = '$from$to${promotion ?? ''}'.toLowerCase();
+    if (promotion == null &&
+        position.pieceAt(from)?.toLowerCase() == 'p' &&
+        (to.endsWith('1') || to.endsWith('8'))) {
+      candidate = '${from}${to}q'.toLowerCase();
+    }
+    candidate = _normalizeCastle(candidate);
+    if (!position.isLegalUci(candidate)) {
+      _selectedSquare = null;
+      _feedback = PuzzleFeedback.idle;
+      _feedbackText = 'Ungültiger Zug';
+      notifyListeners();
+      return false;
+    }
+
     _startStormClockIfNeeded();
 
     final expected = solution[_solutionIndex];
-    var played = '$from$to${promotion ?? ''}'.toLowerCase();
+    var played = candidate;
     if (promotion == null &&
         expected.length == 5 &&
         expected.startsWith('$from$to')) {
@@ -706,6 +832,10 @@ class PuzzleAppController extends ChangeNotifier {
     _runEnded = false;
     _runSelectionIndex = 0;
     _runPuzzleIds.clear();
+    _selectionExcludedPuzzleIds.clear();
+    if (_ignoreSolvedPuzzles) {
+      _selectionExcludedPuzzleIds.addAll(_solvedPuzzleIds);
+    }
     _repository.resetCursors();
 
     if (resetCounters) {
@@ -720,9 +850,15 @@ class PuzzleAppController extends ChangeNotifier {
 
     _runSelections = switch (_mode) {
       PuzzleMode.tasks => const <PuzzleSelection>[],
-      PuzzleMode.streak => PuzzleModePlan.buildStreakSelections(),
-      PuzzleMode.storm => PuzzleModePlan.buildStormSelections(
-        playerColor: _stormPlayerColor,
+      PuzzleMode.streak => _applyCustomRange(
+        PuzzleModePlan.buildStreakSelections(),
+        _streakRange,
+        enabled: _streakCustomRange,
+      ),
+      PuzzleMode.storm => _applyCustomRange(
+        PuzzleModePlan.buildStormSelections(playerColor: _stormPlayerColor),
+        _stormRange,
+        enabled: _stormCustomRange,
       ),
     };
 
@@ -731,7 +867,7 @@ class PuzzleAppController extends ChangeNotifier {
     _runId = _userRepository?.startRun(
       catalogId: _databaseStatus.catalogId ?? 'demo',
       mode: _mode,
-      range: _range,
+      range: range,
       randomMode: _randomMode,
       ratingBefore: _runRatingBefore,
     );
@@ -780,14 +916,7 @@ class PuzzleAppController extends ChangeNotifier {
     StackTrace? loadStackTrace;
 
     try {
-      if (_mode == PuzzleMode.tasks && !_ratedTasks) {
-        puzzle = await _repository.nextPuzzle(
-          range: _range,
-          random: _randomMode,
-        );
-      } else {
-        puzzle = await _repository.selectPuzzle(selection);
-      }
+      puzzle = await _repository.selectPuzzle(selection);
     } on Object catch (error, stackTrace) {
       loadError = error;
       loadStackTrace = stackTrace;
@@ -838,6 +967,8 @@ class PuzzleAppController extends ChangeNotifier {
     _selectedSquare = null;
     _lastFrom = null;
     _lastTo = null;
+    _currentSolvedCount = 0;
+    _currentFailedCount = 0;
 
     if (puzzle == null) {
       _position = null;
@@ -857,7 +988,18 @@ class PuzzleAppController extends ChangeNotifier {
       return;
     }
 
+    if (puzzle.setupMoveUci.length >= 4) {
+      _lastFrom = puzzle.setupMoveUci.substring(0, 2);
+      _lastTo = puzzle.setupMoveUci.substring(2, 4);
+    }
+    final progress = _userRepository?.loadPuzzleProgress(
+      puzzle.lichessPuzzleId,
+    );
+    _currentSolvedCount = progress?.solvedCount ?? 0;
+    _currentFailedCount = progress?.failedCount ?? 0;
+
     _runPuzzleIds.add(puzzle.lichessPuzzleId);
+    _selectionExcludedPuzzleIds.add(puzzle.lichessPuzzleId);
     _solverIsWhite = puzzle.playerColor == 0;
     _playerIsWhite = _solverIsWhite;
     _feedback = PuzzleFeedback.idle;
@@ -936,7 +1078,7 @@ class PuzzleAppController extends ChangeNotifier {
         ? _ratedTaskPrefetchTarget
         : _freeTaskPrefetchTarget;
     final excluded = <String>{
-      ..._runPuzzleIds,
+      ...selection.excludePuzzleIds,
       ..._taskPrefetch.map((value) => value.puzzle.lichessPuzzleId),
     };
 
@@ -977,7 +1119,7 @@ class PuzzleAppController extends ChangeNotifier {
         .clamp(0, _runSelections.length - 1)
         .toInt();
     final excluded = <String>{
-      ..._runPuzzleIds,
+      ..._selectionExcludedPuzzleIds,
       ..._runPrefetch.values.map((value) => value.puzzle.lichessPuzzleId),
     };
 
@@ -1047,11 +1189,15 @@ class PuzzleAppController extends ChangeNotifier {
 
   PuzzleSelection? _selectionForCurrentSlot() {
     if (_mode == PuzzleMode.tasks) {
-      if (!_ratedTasks) {
+      if (!_ratedTasks || _tasksCustomRange) {
         return PuzzleSelection(
-          minRating: _range.minRating,
-          maxRating: _range.maxRating,
-          random: _randomMode,
+          minRating: _tasksRange.minRating,
+          maxRating: _tasksRange.maxRating,
+          random: _randomMode || _ratedTasks,
+          maxRatingDeviation: _ratedTasks ? 150 : null,
+          minPopularity: _ratedTasks ? 0 : null,
+          minPlays: _ratedTasks ? 10 : null,
+          excludePuzzleIds: _selectionExcludedPuzzleIds,
         );
       }
 
@@ -1068,7 +1214,7 @@ class PuzzleAppController extends ChangeNotifier {
         maxRatingDeviation: 150,
         minPopularity: 0,
         minPlays: 10,
-        excludePuzzleIds: _runPuzzleIds,
+        excludePuzzleIds: _selectionExcludedPuzzleIds,
       );
     }
 
@@ -1077,7 +1223,7 @@ class PuzzleAppController extends ChangeNotifier {
     }
 
     return _runSelections[_runSelectionIndex].copyWith(
-      excludePuzzleIds: _runPuzzleIds,
+      excludePuzzleIds: _selectionExcludedPuzzleIds,
     );
   }
 
@@ -1197,11 +1343,30 @@ class PuzzleAppController extends ChangeNotifier {
     final elapsed = _puzzleStartedAt == null
         ? 0
         : DateTime.now().toUtc().difference(_puzzleStartedAt!).inMilliseconds;
-    _userRepository?.recordPuzzleResult(
+    final update = _userRepository?.recordPuzzleResult(
       lichessPuzzleId: puzzle.lichessPuzzleId,
       solved: solved,
       elapsedMs: elapsed,
     );
+    if (update != null) {
+      _currentSolvedCount = update.solvedCount;
+      _currentFailedCount = update.failedCount;
+      if (update.newlySolved) {
+        _solvedPuzzleCount++;
+        _solvedPuzzleIds.add(puzzle.lichessPuzzleId);
+        if (_ignoreSolvedPuzzles) {
+          _selectionExcludedPuzzleIds.add(puzzle.lichessPuzzleId);
+        }
+      }
+    } else if (solved) {
+      final newlySolved = _currentSolvedCount == 0;
+      _currentSolvedCount++;
+      if (newlySolved) {
+        _solvedPuzzleCount++;
+      }
+    } else {
+      _currentFailedCount++;
+    }
   }
 
   void _updateTaskRating({required bool win}) {
@@ -1323,6 +1488,13 @@ class PuzzleAppController extends ChangeNotifier {
       PuzzleSettingsSnapshot(
         range: _range,
         randomMode: _randomMode,
+        tasksRange: _tasksRange,
+        streakRange: _streakRange,
+        stormRange: _stormRange,
+        tasksCustomRange: _tasksCustomRange,
+        streakCustomRange: _streakCustomRange,
+        stormCustomRange: _stormCustomRange,
+        ignoreSolvedPuzzles: _ignoreSolvedPuzzles,
         mode: _mode,
         ratedTasks: _ratedTasks,
         difficulty: _difficulty,
@@ -1332,6 +1504,52 @@ class PuzzleAppController extends ChangeNotifier {
         stormBestCombo: _stormBestCombo,
       ),
     );
+  }
+
+  List<PuzzleSelection> _applyCustomRange(
+    List<PuzzleSelection> source,
+    PuzzleRange range, {
+    required bool enabled,
+  }) {
+    if (!enabled || source.isEmpty) return source;
+    final sourceMin = source.first.minRating;
+    final sourceMax = source.last.maxRating;
+    final sourceSpan = (sourceMax - sourceMin).clamp(1, 10000);
+    final targetSpan = range.maxRating - range.minRating;
+    int mapRating(int value) {
+      final fraction = (value - sourceMin) / sourceSpan;
+      return (range.minRating + targetSpan * fraction).round().clamp(
+        range.minRating,
+        range.maxRating,
+      );
+    }
+
+    return source
+        .map((selection) {
+          final min = mapRating(selection.minRating);
+          final max = mapRating(selection.maxRating);
+          final target = selection.targetRating == null
+              ? null
+              : mapRating(selection.targetRating!);
+          return selection.copyWith(
+            minRating: min,
+            maxRating: max < min ? min : max,
+            targetRating: target,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  String _formatCount(int value) {
+    final digits = value.clamp(0, 9999999999).toString();
+    final buffer = StringBuffer();
+    for (var index = 0; index < digits.length; index++) {
+      if (index > 0 && (digits.length - index) % 3 == 0) {
+        buffer.write('.');
+      }
+      buffer.write(digits[index]);
+    }
+    return buffer.toString();
   }
 
   String _normalizeCastle(String uci) {

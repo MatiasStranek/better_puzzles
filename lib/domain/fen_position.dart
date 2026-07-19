@@ -207,6 +207,185 @@ class FenPosition {
         : FenActiveColor.white;
   }
 
+  FenPosition copy() {
+    return FenPosition._(
+      board: List<String?>.from(_board),
+      activeColor: activeColor,
+      castlingRights: castlingRights,
+      enPassantSquare: enPassantSquare,
+      halfmoveClock: halfmoveClock,
+      fullmoveNumber: fullmoveNumber,
+    );
+  }
+
+  List<String> legalTargetsFrom(String fromSquare) {
+    final piece = pieceAt(fromSquare);
+    if (piece == null) return const <String>[];
+    final movingWhite = _isWhite(piece);
+    if ((activeColor == FenActiveColor.white) != movingWhite) {
+      return const <String>[];
+    }
+
+    final targets = <String>[];
+    for (var rank = 1; rank <= 8; rank++) {
+      for (var file = 0; file < 8; file++) {
+        final to = _squareName(file, rank);
+        final base = '$fromSquare$to';
+        if (piece.toLowerCase() == 'p' && (rank == 1 || rank == 8)) {
+          if (isLegalUci('${base}q')) targets.add(to);
+        } else if (isLegalUci(base)) {
+          targets.add(to);
+        }
+      }
+    }
+    return targets;
+  }
+
+  bool isLegalUci(String uci) {
+    if (!RegExp(r'^[a-h][1-8][a-h][1-8][qrbn]?$').hasMatch(uci)) {
+      return false;
+    }
+    final fromSquare = uci.substring(0, 2);
+    final toSquare = uci.substring(2, 4);
+    if (fromSquare == toSquare) return false;
+
+    final piece = pieceAt(fromSquare);
+    if (piece == null) return false;
+    final movingWhite = _isWhite(piece);
+    if ((activeColor == FenActiveColor.white) != movingWhite) return false;
+
+    final target = pieceAt(toSquare);
+    if (target != null && _isWhite(target) == movingWhite) return false;
+    if (!_isPseudoLegal(uci, piece)) return false;
+
+    final next = copy();
+    try {
+      next.applyUci(uci);
+    } on FormatException {
+      return false;
+    }
+    return !next._isKingInCheck(movingWhite);
+  }
+
+  bool _isPseudoLegal(String uci, String piece) {
+    final fromSquare = uci.substring(0, 2);
+    final toSquare = uci.substring(2, 4);
+    final promotion = uci.length == 5 ? uci.substring(4, 5) : null;
+    final from = _squareIndex(fromSquare);
+    final to = _squareIndex(toSquare);
+    final ff = _fileOf(from), fr = _rankOf(from);
+    final tf = _fileOf(to), tr = _rankOf(to);
+    final df = tf - ff, dr = tr - fr;
+    final white = _isWhite(piece);
+    final target = _board[to];
+
+    switch (piece.toLowerCase()) {
+      case 'p':
+        final direction = white ? 1 : -1;
+        final startRank = white ? 2 : 7;
+        final promotionRank = white ? 8 : 1;
+        if (tr == promotionRank) {
+          if (promotion == null) return false;
+        } else if (promotion != null) {
+          return false;
+        }
+        if (df == 0 && dr == direction && target == null) return true;
+        if (df == 0 &&
+            dr == 2 * direction &&
+            fr == startRank &&
+            target == null) {
+          return _board[_index(ff, fr + direction)] == null;
+        }
+        if (df.abs() == 1 && dr == direction) {
+          if (target != null) return true;
+          if (toSquare != enPassantSquare) return false;
+          final captured = _board[_index(tf, tr - direction)];
+          return captured == (white ? 'p' : 'P');
+        }
+        return false;
+      case 'n':
+        return (df.abs() == 1 && dr.abs() == 2) ||
+            (df.abs() == 2 && dr.abs() == 1);
+      case 'b':
+        return df.abs() == dr.abs() && _pathClear(ff, fr, tf, tr);
+      case 'r':
+        return (df == 0 || dr == 0) && _pathClear(ff, fr, tf, tr);
+      case 'q':
+        return (df == 0 || dr == 0 || df.abs() == dr.abs()) &&
+            _pathClear(ff, fr, tf, tr);
+      case 'k':
+        if (df.abs() <= 1 && dr.abs() <= 1) return true;
+        if (dr != 0 || df.abs() != 2) return false;
+        final right = white ? (df > 0 ? 'K' : 'Q') : (df > 0 ? 'k' : 'q');
+        if (!castlingRights.contains(right)) return false;
+        final rookFile = df > 0 ? 7 : 0;
+        if (!_pathClear(ff, fr, rookFile, fr)) return false;
+        if (_isKingInCheck(white)) return false;
+        final middle = _squareName(ff + (df > 0 ? 1 : -1), fr);
+        if (_isSquareAttacked(middle, !white)) return false;
+        return !_isSquareAttacked(toSquare, !white);
+    }
+    return false;
+  }
+
+  bool _pathClear(int ff, int fr, int tf, int tr) {
+    final sf = (tf - ff).sign;
+    final sr = (tr - fr).sign;
+    var f = ff + sf, r = fr + sr;
+    while (f != tf || r != tr) {
+      if (_board[_index(f, r)] != null) return false;
+      f += sf;
+      r += sr;
+    }
+    return true;
+  }
+
+  bool _isKingInCheck(bool white) {
+    final king = white ? 'K' : 'k';
+    for (var i = 0; i < 64; i++) {
+      if (_board[i] == king) {
+        return _isSquareAttacked(_squareName(_fileOf(i), _rankOf(i)), !white);
+      }
+    }
+    return true;
+  }
+
+  bool _isSquareAttacked(String square, bool byWhite) {
+    final target = _squareIndex(square);
+    final tf = _fileOf(target), tr = _rankOf(target);
+    for (var i = 0; i < 64; i++) {
+      final piece = _board[i];
+      if (piece == null || _isWhite(piece) != byWhite) continue;
+      final ff = _fileOf(i), fr = _rankOf(i);
+      final df = tf - ff, dr = tr - fr;
+      switch (piece.toLowerCase()) {
+        case 'p':
+          if (dr == (byWhite ? 1 : -1) && df.abs() == 1) return true;
+          break;
+        case 'n':
+          if ((df.abs() == 1 && dr.abs() == 2) ||
+              (df.abs() == 2 && dr.abs() == 1))
+            return true;
+          break;
+        case 'b':
+          if (df.abs() == dr.abs() && _pathClear(ff, fr, tf, tr)) return true;
+          break;
+        case 'r':
+          if ((df == 0 || dr == 0) && _pathClear(ff, fr, tf, tr)) return true;
+          break;
+        case 'q':
+          if ((df == 0 || dr == 0 || df.abs() == dr.abs()) &&
+              _pathClear(ff, fr, tf, tr))
+            return true;
+          break;
+        case 'k':
+          if (df.abs() <= 1 && dr.abs() <= 1) return true;
+          break;
+      }
+    }
+    return false;
+  }
+
   String toFen() {
     final rankTexts = <String>[];
 

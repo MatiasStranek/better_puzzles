@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../controllers/puzzle_app_controller.dart';
 import '../../../domain/puzzle_mode.dart';
@@ -25,10 +26,94 @@ class MobilePuzzleSideMenu extends StatelessWidget {
     onClose();
   }
 
+  Future<int?> _showRatingInputDialog(
+    BuildContext context, {
+    required String label,
+    required int value,
+    required int minimum,
+    required int maximum,
+  }) async {
+    final textController = TextEditingController(text: '$value');
+    textController.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: textController.text.length,
+    );
+    String? errorText;
+
+    final result = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            void submit() {
+              final parsed = int.tryParse(textController.text.trim());
+              if (parsed == null || parsed < minimum || parsed > maximum) {
+                setDialogState(() {
+                  errorText =
+                      'Bitte eine Zahl von $minimum bis $maximum eingeben.';
+                });
+                return;
+              }
+              Navigator.of(dialogContext).pop(parsed);
+            }
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF1B1B1B),
+              title: Text('$label-Rating eingeben'),
+              content: TextField(
+                controller: textController,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.done,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                onChanged: (_) {
+                  if (errorText != null) {
+                    setDialogState(() => errorText = null);
+                  }
+                },
+                onSubmitted: (_) => submit(),
+                decoration: InputDecoration(
+                  labelText: label,
+                  suffixText: 'ELO',
+                  helperText: 'Erlaubt: $minimum–$maximum',
+                  errorText: errorText,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Abbrechen'),
+                ),
+                FilledButton(
+                  onPressed: submit,
+                  child: const Text('Bestätigen'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    textController.dispose();
+    return result;
+  }
+
   Future<void> _showRangeDialog(BuildContext context) async {
     if (!isEnabled) return;
-    var min = controller.range.minRating;
-    var max = controller.range.maxRating;
+    final minimumRating = controller.databaseStatus.minRating ?? 400;
+    final maximumRating = controller.databaseStatus.maxRating ?? 3000;
+    final sliderDivisions = ((maximumRating - minimumRating) / 100)
+        .round()
+        .clamp(1, 100)
+        .toInt();
+    var min = controller.range.minRating
+        .clamp(minimumRating, maximumRating)
+        .toInt();
+    var max = controller.range.maxRating
+        .clamp(minimumRating, maximumRating)
+        .toInt();
 
     await showModalBottomSheet<void>(
       context: context,
@@ -66,8 +151,8 @@ class MobilePuzzleSideMenu extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Rating Range',
+                  Text(
+                    '${controller.mode.label} · Rating Range',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -75,31 +160,73 @@ class MobilePuzzleSideMenu extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  _RangeValue(label: 'Min', value: min),
+                  _RangeValue(
+                    label: 'Min',
+                    value: min,
+                    onTap: () async {
+                      final entered = await _showRatingInputDialog(
+                        context,
+                        label: 'Minimum',
+                        value: min,
+                        minimum: minimumRating,
+                        maximum: maximumRating,
+                      );
+                      if (entered == null) return;
+                      setModalState(() {
+                        min = entered;
+                        if (min > max) max = min;
+                      });
+                    },
+                  ),
                   Slider(
                     value: min.toDouble(),
-                    min: 400,
-                    max: 3000,
-                    divisions: 26,
+                    min: minimumRating.toDouble(),
+                    max: maximumRating.toDouble(),
+                    divisions: sliderDivisions,
                     label: '$min',
                     onChanged: (value) => setModalState(() {
                       min = value.round();
                       if (min > max) max = min;
                     }),
                   ),
-                  _RangeValue(label: 'Max', value: max),
+                  _RangeValue(
+                    label: 'Max',
+                    value: max,
+                    onTap: () async {
+                      final entered = await _showRatingInputDialog(
+                        context,
+                        label: 'Maximum',
+                        value: max,
+                        minimum: minimumRating,
+                        maximum: maximumRating,
+                      );
+                      if (entered == null) return;
+                      setModalState(() {
+                        max = entered;
+                        if (max < min) min = max;
+                      });
+                    },
+                  ),
                   Slider(
                     value: max.toDouble(),
-                    min: 400,
-                    max: 3000,
-                    divisions: 26,
+                    min: minimumRating.toDouble(),
+                    max: maximumRating.toDouble(),
+                    divisions: sliderDivisions,
                     label: '$max',
                     onChanged: (value) => setModalState(() {
                       max = value.round();
                       if (max < min) min = max;
                     }),
                   ),
-                  const SizedBox(height: 14),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      controller.resetRangeForCurrentMode();
+                      Navigator.of(context).pop();
+                    },
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    label: const Text('Lichess-Standard wiederherstellen'),
+                  ),
+                  const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -141,6 +268,15 @@ class MobilePuzzleSideMenu extends StatelessWidget {
             isEnabled: isEnabled,
             isHighlighted: controller.ratedTasks,
           ),
+          _SideMenuButton(
+            icon: Icons.tune_rounded,
+            label: 'Ratingbereich',
+            value: controller.customRangeEnabled
+                ? controller.range.label
+                : 'Lichess-Standard',
+            onTap: () => _showRangeDialog(context),
+            isEnabled: isEnabled,
+          ),
           if (controller.ratedTasks)
             _SideMenuButton(
               icon: Icons.trending_up_rounded,
@@ -171,6 +307,15 @@ class MobilePuzzleSideMenu extends StatelessWidget {
       case PuzzleMode.streak:
         return [
           _SideMenuButton(
+            icon: Icons.tune_rounded,
+            label: 'Ratingbereich',
+            value: controller.customRangeEnabled
+                ? controller.range.label
+                : 'Lichess-Standard',
+            onTap: () => _showRangeDialog(context),
+            isEnabled: isEnabled,
+          ),
+          _SideMenuButton(
             icon: Icons.local_fire_department_rounded,
             label: 'Streak',
             value: '${controller.streak} · Best ${controller.streakBest}',
@@ -188,6 +333,15 @@ class MobilePuzzleSideMenu extends StatelessWidget {
         ];
       case PuzzleMode.storm:
         return [
+          _SideMenuButton(
+            icon: Icons.tune_rounded,
+            label: 'Ratingbereich',
+            value: controller.customRangeEnabled
+                ? controller.range.label
+                : 'Lichess-Standard',
+            onTap: () => _showRangeDialog(context),
+            isEnabled: isEnabled,
+          ),
           _SideMenuButton(
             icon: Icons.timer_rounded,
             label: 'Zeit',
@@ -263,6 +417,27 @@ class MobilePuzzleSideMenu extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             ..._modeControls(context),
+                            _SideMenuButton(
+                              icon: controller.ignoreSolvedPuzzles
+                                  ? Icons.filter_alt_rounded
+                                  : Icons.filter_alt_off_rounded,
+                              label: 'Erfolgreiche ignorieren',
+                              value: controller.ignoreSolvedPuzzles
+                                  ? 'Aktiv · bereits gelöste werden übersprungen'
+                                  : 'Aus · Wiederholungen sind erlaubt',
+                              onTap: () => controller.setIgnoreSolvedPuzzles(
+                                !controller.ignoreSolvedPuzzles,
+                              ),
+                              isEnabled: isEnabled,
+                              isHighlighted: controller.ignoreSolvedPuzzles,
+                            ),
+                            _SideMenuButton(
+                              icon: Icons.check_circle_outline_rounded,
+                              label: 'Puzzle-Fortschritt',
+                              value: controller.solvedPuzzleProgressLabel,
+                              onTap: null,
+                              isEnabled: isEnabled,
+                            ),
                             _SideMenuButton(
                               icon: Icons.analytics_rounded,
                               label: controller.primaryMetricLabel,
@@ -353,29 +528,53 @@ class MobilePuzzleSideMenu extends StatelessWidget {
 }
 
 class _RangeValue extends StatelessWidget {
-  const _RangeValue({required this.label, required this.value});
+  const _RangeValue({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+
   final String label;
   final int value;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      Text(
-        label,
-        style: TextStyle(
-          color: Colors.white.withAlpha(150),
-          fontWeight: FontWeight.w800,
-        ),
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    child: OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        side: BorderSide(color: Colors.white.withAlpha(32)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
-      const Spacer(),
-      Text(
-        '$value',
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w900,
-        ),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withAlpha(170),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '$value',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Icon(
+            Icons.edit_rounded,
+            size: 18,
+            color: Colors.white.withAlpha(150),
+          ),
+        ],
       ),
-    ],
+    ),
   );
 }
 

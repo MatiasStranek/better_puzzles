@@ -215,7 +215,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(3, 1880154504866592291),
     name: 'PuzzleSettingsEntity',
-    lastPropertyId: const obx_int.IdUid(15, 1138298667090671640),
+    lastPropertyId: const obx_int.IdUid(25, 3407652713366151788),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -306,6 +306,66 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(15, 1138298667090671640),
         name: 'stormBestCombo',
         type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(16, 5807724035914237428),
+        name: 'tasksMinRating',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(17, 3410860587038430029),
+        name: 'tasksMaxRating',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(18, 236930486962317697),
+        name: 'streakMinRating',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(19, 8594536490897314252),
+        name: 'streakMaxRating',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(20, 2673119320015887369),
+        name: 'stormMinRating',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(21, 2945565327755757634),
+        name: 'stormMaxRating',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(22, 6781869724337994995),
+        name: 'tasksCustomRange',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(23, 5754236924984151360),
+        name: 'streakCustomRange',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(24, 4142510854602578492),
+        name: 'stormCustomRange',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(25, 3407652713366151788),
+        name: 'ignoreSolvedPuzzles',
+        type: 1,
         flags: 0,
       ),
     ],
@@ -677,7 +737,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
       objectToFB: (PuzzleSettingsEntity object, fb.Builder fbb) {
         final selectedModeOffset = fbb.writeString(object.selectedMode);
         final puzzleDifficultyOffset = fbb.writeString(object.puzzleDifficulty);
-        fbb.startTable(16);
+        fbb.startTable(26);
         fbb.addInt64(0, object.id);
         fbb.addInt64(1, object.minRating);
         fbb.addInt64(2, object.maxRating);
@@ -693,6 +753,16 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addInt64(12, object.streakBest);
         fbb.addInt64(13, object.stormBest);
         fbb.addInt64(14, object.stormBestCombo);
+        fbb.addInt64(15, object.tasksMinRating);
+        fbb.addInt64(16, object.tasksMaxRating);
+        fbb.addInt64(17, object.streakMinRating);
+        fbb.addInt64(18, object.streakMaxRating);
+        fbb.addInt64(19, object.stormMinRating);
+        fbb.addInt64(20, object.stormMaxRating);
+        fbb.addBool(21, object.tasksCustomRange);
+        fbb.addBool(22, object.streakCustomRange);
+        fbb.addBool(23, object.stormCustomRange);
+        fbb.addBool(24, object.ignoreSolvedPuzzles);
         fbb.finish(fbb.endTable());
         return object.id;
       },
@@ -716,6 +786,66 @@ obx_int.ModelDefinition getObjectBoxModel() {
           rootOffset,
           8,
           0,
+        );
+        final tasksMinRatingParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          34,
+          0,
+        );
+        final tasksMaxRatingParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          36,
+          0,
+        );
+        final streakMinRatingParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          38,
+          0,
+        );
+        final streakMaxRatingParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          40,
+          0,
+        );
+        final stormMinRatingParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          42,
+          0,
+        );
+        final stormMaxRatingParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          44,
+          0,
+        );
+        final tasksCustomRangeParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          46,
+          false,
+        );
+        final streakCustomRangeParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          48,
+          false,
+        );
+        final stormCustomRangeParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          50,
+          false,
+        );
+        final ignoreSolvedPuzzlesParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          52,
+          false,
         );
         final randomModeParam = const fb.BoolReader().vTableGet(
           buffer,
@@ -787,6 +917,16 @@ obx_int.ModelDefinition getObjectBoxModel() {
           id: idParam,
           minRating: minRatingParam,
           maxRating: maxRatingParam,
+          tasksMinRating: tasksMinRatingParam,
+          tasksMaxRating: tasksMaxRatingParam,
+          streakMinRating: streakMinRatingParam,
+          streakMaxRating: streakMaxRatingParam,
+          stormMinRating: stormMinRatingParam,
+          stormMaxRating: stormMaxRatingParam,
+          tasksCustomRange: tasksCustomRangeParam,
+          streakCustomRange: streakCustomRangeParam,
+          stormCustomRange: stormCustomRangeParam,
+          ignoreSolvedPuzzles: ignoreSolvedPuzzlesParam,
           randomMode: randomModeParam,
           selectedMode: selectedModeParam,
           ratedTasks: ratedTasksParam,
@@ -1087,6 +1227,60 @@ class PuzzleSettingsEntity_ {
   static final stormBestCombo = obx.QueryIntegerProperty<PuzzleSettingsEntity>(
     _entities[2].properties[14],
   );
+
+  /// See [PuzzleSettingsEntity.tasksMinRating].
+  static final tasksMinRating = obx.QueryIntegerProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[15],
+  );
+
+  /// See [PuzzleSettingsEntity.tasksMaxRating].
+  static final tasksMaxRating = obx.QueryIntegerProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[16],
+  );
+
+  /// See [PuzzleSettingsEntity.streakMinRating].
+  static final streakMinRating = obx.QueryIntegerProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[17],
+  );
+
+  /// See [PuzzleSettingsEntity.streakMaxRating].
+  static final streakMaxRating = obx.QueryIntegerProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[18],
+  );
+
+  /// See [PuzzleSettingsEntity.stormMinRating].
+  static final stormMinRating = obx.QueryIntegerProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[19],
+  );
+
+  /// See [PuzzleSettingsEntity.stormMaxRating].
+  static final stormMaxRating = obx.QueryIntegerProperty<PuzzleSettingsEntity>(
+    _entities[2].properties[20],
+  );
+
+  /// See [PuzzleSettingsEntity.tasksCustomRange].
+  static final tasksCustomRange =
+      obx.QueryBooleanProperty<PuzzleSettingsEntity>(
+        _entities[2].properties[21],
+      );
+
+  /// See [PuzzleSettingsEntity.streakCustomRange].
+  static final streakCustomRange =
+      obx.QueryBooleanProperty<PuzzleSettingsEntity>(
+        _entities[2].properties[22],
+      );
+
+  /// See [PuzzleSettingsEntity.stormCustomRange].
+  static final stormCustomRange =
+      obx.QueryBooleanProperty<PuzzleSettingsEntity>(
+        _entities[2].properties[23],
+      );
+
+  /// See [PuzzleSettingsEntity.ignoreSolvedPuzzles].
+  static final ignoreSolvedPuzzles =
+      obx.QueryBooleanProperty<PuzzleSettingsEntity>(
+        _entities[2].properties[24],
+      );
 }
 
 /// [UserStoreMetaEntity] entity fields to define ObjectBox queries.
